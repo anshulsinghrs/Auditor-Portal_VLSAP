@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { 
   Compass, LayoutDashboard, Settings, Award, ArrowLeft, ArrowRight, Upload, Sparkles, 
-  UserCheck, Eye, RefreshCw, Layers, User, Bot, ShieldCheck, LogOut, Shuffle
+  UserCheck, Eye, RefreshCw, Layers, User, Bot, ShieldCheck, LogOut, Shuffle, AlertCircle
 } from "lucide-react";
 import RaterInstructions from "./components/RaterInstructions";
 import ImageViewer from "./components/ImageViewer";
@@ -43,11 +43,15 @@ export default function App() {
 
   // Filtered images list assigned to the logged-in auditor
   const activeImages = React.useMemo(() => {
-    if (auditorProfile && auditorImages[auditorProfile] && auditorImages[auditorProfile].length > 0) {
-      const assignedIds = auditorImages[auditorProfile];
+    if (!auditorProfile) return images;
+    
+    const assignedIds = auditorImages[auditorProfile];
+    if (assignedIds && assignedIds.length > 0) {
       return images.filter((img) => assignedIds.includes(img.id));
     }
-    return images;
+    
+    // Return empty list if logged in but no images assigned
+    return [];
   }, [images, auditorProfile, auditorImages]);
 
   // Variables definitions (loaded from JSON)
@@ -747,8 +751,12 @@ export default function App() {
                   </div>
                 </div>
               ) : (
-                <div className="p-8 text-center border rounded border-slate-200 bg-white text-slate-400 font-sans text-xs">
-                  No images loaded. Please contact the project admin to sync images.
+                <div className="p-12 text-center border rounded-md border-amber-200 bg-amber-50/40 text-slate-500 font-sans text-xs flex flex-col items-center justify-center gap-2.5 shadow-sm max-w-md mx-auto my-8">
+                  <AlertCircle className="h-8 w-8 text-amber-600 animate-pulse" />
+                  <span className="font-bold text-slate-800 text-sm">No Task Assigned</span>
+                  <p className="text-slate-500 leading-normal text-[11px]">
+                    You do not have any calibration panoramas assigned to your auditor profile yet. Please ask the project administrator to assign your task queue.
+                  </p>
                 </div>
               )}
 
