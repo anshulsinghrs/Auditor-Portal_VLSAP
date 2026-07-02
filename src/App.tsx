@@ -278,6 +278,16 @@ export default function App() {
     localStorage.removeItem("vlsap_auditor_profile");
   };
 
+  // Protect AI Audit and Admin Dashboard with a password gate
+  const handleSecureNavigation = (view: "ai" | "admin") => {
+    const password = window.prompt(`Please enter the security password to access the ${view === "admin" ? "Admin Dashboard" : "AI Audit Interface"}:`);
+    if (password === "TechnoWER@123") {
+      setActiveView(view);
+    } else if (password !== null) {
+      alert("Incorrect password! Access denied.");
+    }
+  };
+
   // Immediate autosave mechanism to server db
   const handleSaveAnswer = async (
     variableId: string, 
@@ -668,7 +678,7 @@ export default function App() {
 
               {/* AI Audit Card */}
               <button
-                onClick={() => setActiveView("ai")}
+                onClick={() => handleSecureNavigation("ai")}
                 className="group bg-white border-2 border-slate-200 hover:border-slate-900 rounded-xl p-6 flex flex-col items-center gap-4 transition-all cursor-pointer hover:shadow-lg hover:-translate-y-1 active:translate-y-0 text-center"
               >
                 <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-md group-hover:scale-110 transition-transform">
@@ -687,7 +697,7 @@ export default function App() {
 
               {/* Admin Card */}
               <button
-                onClick={() => setActiveView("admin")}
+                onClick={() => handleSecureNavigation("admin")}
                 className="group bg-white border-2 border-slate-200 hover:border-slate-900 rounded-xl p-6 flex flex-col items-center gap-4 transition-all cursor-pointer hover:shadow-lg hover:-translate-y-1 active:translate-y-0 text-center"
               >
                 <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shadow-md group-hover:scale-110 transition-transform">
