@@ -15028,5 +15028,34 @@
   "calibrationPhase": "Cold Read",
   "googleApiKey": "AIzaSyCPWbsDaKSIPpo8SagERbNqAQHV-gTPO1w",
   "googleDriveFolderId": "1ENECfT_ETGATB4533yAEKRZ-HugbMbad",
-  "instrumentLocked": false
+  "instrumentLocked": false,
+  "auditorImages": {
+    "Rater A": [
+      "VLSAP-Local-0493",
+      "VLSAP-Local-0520",
+      "VLSAP-Local-0608",
+      "VLSAP-Local-0227",
+      "VLSAP-Local-0279",
+      "VLSAP-Local-0004",
+      "VLSAP-Local-0798",
+      "VLSAP-Local-0660",
+      "VLSAP-Local-0683",
+      "VLSAP-Local-0348",
+      "VLSAP-Local-0439",
+      "VLSAP-Local-0234",
+      "VLSAP-Local-0440",
+      "VLSAP-Local-0969",
+      "VLSAP-Local-0991",
+      "VLSAP-Local-0800",
+      "VLSAP-Local-0596",
+      "VLSAP-Local-0123",
+      "VLSAP-Local-0832",
+      "VLSAP-Local-0079",
+      "VLSAP-Local-0938",
+      "VLSAP-Local-0263",
+      "VLSAP-Local-0237",
+      "VLSAP-Local-0350",
+      "VLSAP-Local-0988"
+    ]
+  }
 }

@@ -100,6 +100,16 @@ export default function App() {
     localStorage.setItem("vlsap_active_view", activeView);
   }, [activeView]);
 
+  // Automatically assign 25 random images if a logged-in rater has no active assignment
+  useEffect(() => {
+    if (!loading && auditorProfile && images.length > 0) {
+      const assigned = auditorImages[auditorProfile];
+      if (!assigned || assigned.length === 0) {
+        handleAssignImages(auditorProfile, 25);
+      }
+    }
+  }, [auditorProfile, auditorImages, loading, images]);
+
   const handleAcceptInstructions = () => {
     localStorage.setItem("vlsap_instructions_accepted", "true");
     setShowInstructions(false);
