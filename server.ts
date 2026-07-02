@@ -38,8 +38,28 @@ async function loadState() {
   if (MONGODB_URI && dbCollection) {
     try {
       const doc = await dbCollection.findOne({ _id: "app_state" });
+      
+      // Load db.json from disk to check if it has updated images
+      let diskImages = [];
+      if (fs.existsSync(DB_FILE)) {
+        try {
+          const diskContent = fs.readFileSync(DB_FILE, "utf-8");
+          const diskState = JSON.parse(diskContent);
+          if (diskState && diskState.images) {
+            diskImages = diskState.images;
+          }
+        } catch (e) {
+          console.error("Failed to read DB_FILE from disk:", e);
+        }
+      }
+
       if (doc) {
         const { _id, ...state } = doc;
+        if (diskImages.length > 0 && (!state.images || state.images.length !== diskImages.length)) {
+          console.log(`Syncing MongoDB images count from ${state.images?.length || 0} to ${diskImages.length} from db.json`);
+          state.images = diskImages;
+          await dbCollection.replaceOne({ _id: "app_state" }, { ...state }, { upsert: true });
+        }
         return state;
       } else {
         const initialState = {
