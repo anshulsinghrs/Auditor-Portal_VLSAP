@@ -36,7 +36,6 @@ export default function App() {
   const [instrumentLocked, setInstrumentLocked] = useState(false);
 
   // Active Session State
-  const [activeProtocol, setActiveProtocol] = useState<"A" | "B">("A");
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isAiAuditing, setIsAiAuditing] = useState(false);
   const [dragActive, setDragActive] = useState(false);
@@ -155,7 +154,7 @@ export default function App() {
       confidence: data.confidence,
       comment: data.comment,
       mode: calibrationPhase === "Reconciliation" ? "Validation" : calibrationPhase,
-      protocol: activeProtocol
+      protocol: "A"
     };
 
     // Optimistically update local React UI state
@@ -354,7 +353,7 @@ export default function App() {
         a.imageId === activeImage.id &&
         a.auditorId === activeRater &&
         a.mode === (calibrationPhase === "Reconciliation" ? "Validation" : calibrationPhase) &&
-        a.protocol === activeProtocol
+        a.protocol === "A"
     );
 
     const map: Record<string, { value: string; confidence: number; comment: string }> = {};
@@ -362,7 +361,7 @@ export default function App() {
       map[a.variableId] = { value: a.value, confidence: a.confidence, comment: a.comment };
     });
     return map;
-  }, [audits, images, currentImageIndex, auditorProfile, calibrationPhase, activeProtocol]);
+  }, [audits, images, currentImageIndex, auditorProfile, calibrationPhase]);
 
   // Compute auditor progress
   const auditorProgress = React.useMemo(() => {
@@ -625,10 +624,8 @@ export default function App() {
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
                   {/* Left: Viewport */}
                   <div className="lg:col-span-7 space-y-2.5">
-                    <ImageViewer 
-                      image={images[currentImageIndex]} 
-                      protocol={activeProtocol}
-                      onToggleProtocol={setActiveProtocol}
+                    <ImageViewer
+                      image={images[currentImageIndex]}
                     />
                   </div>
 
@@ -639,7 +636,6 @@ export default function App() {
                       currentImageId={images[currentImageIndex].id}
                       activeRater={auditorProfile}
                       activeMode={calibrationPhase === "Reconciliation" ? "Validation" : calibrationPhase}
-                      activeProtocol={activeProtocol}
                       answers={activeAnswers}
                       onSaveAnswer={handleSaveAnswer}
                     />
@@ -700,8 +696,6 @@ export default function App() {
             raters={raters}
             currentImageIndex={currentImageIndex}
             onChangeImage={setCurrentImageIndex}
-            activeProtocol={activeProtocol}
-            onToggleProtocol={setActiveProtocol}
             onTriggerGeminiAudit={handleTriggerGeminiAudit}
             isAiAuditing={isAiAuditing}
             onRefreshStats={fetchState}
