@@ -216,6 +216,73 @@ app.post("/api/audits/clear", async (req, res) => {
   await saveState(state);
   res.json({ success: true });
 });
+app.post("/api/images/shuffle-limit", async (req, res) => {
+  const count = Number(req.body.count) || 25;
+  const state = await loadState();
+  
+  // Always load from the bundled db.json (which contains the full pool of 1000 images)
+  let fullImages = [];
+  const BUNDLED_DB = path.join(process.cwd(), "db.json");
+  if (fs.existsSync(BUNDLED_DB)) {
+    try {
+      const diskContent = fs.readFileSync(BUNDLED_DB, "utf-8");
+      const diskState = JSON.parse(diskContent);
+      if (diskState && diskState.images) {
+        fullImages = diskState.images;
+      }
+    } catch (e) {
+      console.error("Failed to read bundled db.json:", e);
+    }
+  }
+
+  if (fullImages.length === 0) {
+    fullImages = state.images; // fallback
+  }
+
+  if (fullImages.length === 0) {
+    return res.status(400).json({ error: "No images found in catalog to shuffle." });
+  }
+
+  // Fisher-Yates Shuffle
+  const shuffled = [...fullImages];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+
+  // Slice first N
+  const activeImages = shuffled.slice(0, count);
+  state.images = activeImages;
+
+  await saveState(state);
+  res.json({ success: true, message: `Shuffled and limited active queue to ${activeImages.length} images.`, images: activeImages });
+});
+
+app.post("/api/images/reset", async (req, res) => {
+  const state = await loadState();
+  
+  let fullImages = [];
+  const BUNDLED_DB = path.join(process.cwd(), "db.json");
+  if (fs.existsSync(BUNDLED_DB)) {
+    try {
+      const diskContent = fs.readFileSync(BUNDLED_DB, "utf-8");
+      const diskState = JSON.parse(diskContent);
+      if (diskState && diskState.images) {
+        fullImages = diskState.images;
+      }
+    } catch (e: any) {
+      console.error("Failed to read bundled db.json:", e.message);
+    }
+  }
+
+  if (fullImages.length === 0) {
+    return res.status(400).json({ error: "No images found in catalog to reset." });
+  }
+
+  state.images = fullImages;
+  await saveState(state);
+  res.json({ success: true, message: `Restored full catalog of ${fullImages.length} images.`, images: fullImages });
+});
 
 app.post("/api/images/sync", async (req, res) => {
   const state = await loadState();

@@ -247,6 +247,44 @@ export default function App() {
     return { success: data.success, message: data.message };
   };
 
+  // Shuffle and Limit active queue
+  const handleShuffleImages = async (count: number) => {
+    try {
+      const res = await fetch("/api/images/shuffle-limit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ count })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setImages(data.images);
+        setCurrentImageIndex(0); // reset page index to first image of new queue
+        return { success: true, message: data.message };
+      }
+      return { success: false, message: data.error || "Failed to size queue." };
+    } catch (e: any) {
+      console.error(e);
+      return { success: false, message: e.message || "Network error occurred." };
+    }
+  };
+
+  // Reset/Restore full images list from bundled catalog
+  const handleResetImages = async () => {
+    try {
+      const res = await fetch("/api/images/reset", { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        setImages(data.images);
+        setCurrentImageIndex(0);
+        return { success: true, message: data.message };
+      }
+      return { success: false, message: data.error || "Failed to reset catalog." };
+    } catch (e: any) {
+      console.error(e);
+      return { success: false, message: e.message || "Network error occurred." };
+    }
+  };
+
   // Call server-side Gemini 3.5-flash audit evaluating active image
   const handleTriggerGeminiAudit = async () => {
     const activeImage = images[currentImageIndex];
@@ -755,6 +793,8 @@ export default function App() {
           onSaveSettings={handleSaveSettings}
           onTriggerDriveSync={handleTriggerDriveSync}
           onClearAudits={handleClearAudits}
+          onShuffleImages={handleShuffleImages}
+          onResetImages={handleResetImages}
         />
 
         {/* IRR & Calibration Statistics */}

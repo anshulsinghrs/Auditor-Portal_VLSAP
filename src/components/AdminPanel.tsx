@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { 
-  FolderSync, UserPlus, Trash2, Key, Lock, Unlock, Download, Calendar, Play, AlertCircle, CheckCircle, Database 
+  FolderSync, UserPlus, Trash2, Key, Lock, Unlock, Download, Calendar, Play, AlertCircle, CheckCircle, Database, Shuffle, RefreshCw, Sparkles 
 } from "lucide-react";
 import { StreetViewImage, AuditRecord } from "../types";
 
@@ -23,6 +23,8 @@ interface AdminPanelProps {
   }) => void;
   onTriggerDriveSync: (apiKey: string, folderId: string) => Promise<{ success: boolean; message: string }>;
   onClearAudits: () => void;
+  onShuffleImages: (count: number) => Promise<{ success: boolean; message: string }>;
+  onResetImages: () => Promise<{ success: boolean; message: string }>;
 }
 
 export default function AdminPanel({
@@ -36,7 +38,9 @@ export default function AdminPanel({
   currentProject,
   onSaveSettings,
   onTriggerDriveSync,
-  onClearAudits
+  onClearAudits,
+  onShuffleImages,
+  onResetImages
 }: AdminPanelProps) {
   const [newRater, setNewRater] = useState("");
   const [apiKeyInput, setApiKeyInput] = useState(googleApiKey);
@@ -47,6 +51,48 @@ export default function AdminPanel({
   });
   const [isSyncing, setIsSyncing] = useState(false);
   const [projectNameInput, setProjectNameInput] = useState(currentProject);
+  
+  // Sizing and shuffle states
+  const [sessionCount, setSessionCount] = useState(25);
+  const [isSizing, setIsSizing] = useState(false);
+  const [sizeStatus, setSizeStatus] = useState<{ type: "success" | "error" | null; message: string }>({
+    type: null,
+    message: ""
+  });
+
+  const handleShuffleLimit = async () => {
+    setIsSizing(true);
+    setSizeStatus({ type: null, message: "" });
+    try {
+      const res = await onShuffleImages(sessionCount);
+      if (res.success) {
+        setSizeStatus({ type: "success", message: res.message });
+      } else {
+        setSizeStatus({ type: "error", message: res.message || "Failed to configure queue." });
+      }
+    } catch (e: any) {
+      setSizeStatus({ type: "error", message: e.message || "An unexpected error occurred." });
+    } finally {
+      setIsSizing(false);
+    }
+  };
+
+  const handleResetImages = async () => {
+    setIsSizing(true);
+    setSizeStatus({ type: null, message: "" });
+    try {
+      const res = await onResetImages();
+      if (res.success) {
+        setSizeStatus({ type: "success", message: res.message });
+      } else {
+        setSizeStatus({ type: "error", message: res.message || "Failed to reset queue." });
+      }
+    } catch (e: any) {
+      setSizeStatus({ type: "error", message: e.message || "An unexpected error occurred." });
+    } finally {
+      setIsSizing(false);
+    }
+  };
 
   // 1. Export as CSV
   const handleExportCSV = () => {
@@ -402,6 +448,68 @@ export default function AdminPanel({
                 )}
               </button>
             </div>
+          </div>
+        </div>
+
+        {/* Card 5: Audit Session Sizing & Randomization */}
+        <div className="bg-white border border-slate-200/80 rounded p-3 shadow-none space-y-2.5">
+          <div className="flex items-center space-x-2 border-b border-slate-100 pb-2">
+            <Sparkles className="h-4 w-4 text-amber-500 animate-pulse" />
+            <div>
+              <h3 className="text-xs font-bold text-slate-900 leading-tight">Session Sizing & Randomization</h3>
+              <p className="text-[9px] text-slate-400 font-mono">Limit active queues to random subsets of images</p>
+            </div>
+          </div>
+
+          <div className="space-y-2.5 text-xs">
+            <p className="text-slate-500 leading-normal text-[11px]">
+              Set a calibration segment (e.g. 25 random images) for your raters. All raters will see the same randomized sequence.
+            </p>
+
+            <div className="flex items-center gap-2 bg-slate-50 p-2 rounded border border-slate-200">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[8px] font-bold text-slate-500 uppercase font-mono">Images count</span>
+                <input
+                  type="number"
+                  min="1"
+                  max="1000"
+                  value={sessionCount}
+                  onChange={(e) => setSessionCount(Math.max(1, Number(e.target.value) || 25))}
+                  className="w-16 bg-white border border-slate-200 rounded px-1.5 py-0.5 text-center font-bold text-[11px] outline-none"
+                />
+              </div>
+
+              <div className="flex-1 flex flex-col gap-1">
+                <button
+                  onClick={handleShuffleLimit}
+                  disabled={isSizing}
+                  className="w-full py-1 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-bold text-[10px] rounded transition-colors cursor-pointer border border-slate-950 flex items-center justify-center gap-1"
+                >
+                  <Shuffle className="h-3 w-3" />
+                  {isSizing ? "Processing..." : `Shuffle & Limit to ${sessionCount}`}
+                </button>
+
+                <button
+                  onClick={handleResetImages}
+                  disabled={isSizing}
+                  className="w-full py-1 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold text-[10px] rounded cursor-pointer flex items-center justify-center gap-1"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                  Restore Full Catalog ({images.length})
+                </button>
+              </div>
+            </div>
+
+            {sizeStatus.type && (
+              <div className={`p-1.5 rounded text-[10px] flex items-center gap-1 border ${
+                sizeStatus.type === "success" 
+                  ? "bg-emerald-50 border-emerald-150 text-emerald-700" 
+                  : "bg-red-50 border-red-150 text-red-700"
+              }`}>
+                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                <span>{sizeStatus.message}</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
