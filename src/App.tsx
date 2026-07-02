@@ -10,7 +10,6 @@ import AuditorProfile from "./components/AuditorProfile";
 import AiAuditPanel from "./components/AiAuditPanel";
 import ComparisonDashboard from "./components/ComparisonDashboard";
 import AdminPanel from "./components/AdminPanel";
-import { mockImages } from "./data/mock_images";
 import variablesData from "./data/variables.json";
 import { StreetViewImage, AuditRecord, VLSAPVariable, ServerState } from "./types";
 
