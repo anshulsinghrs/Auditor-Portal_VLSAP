@@ -5,6 +5,7 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
 import { getFullPilotImages } from "./src/data/mock_images.ts";
+import { MongoClient } from "mongodb";
 
 dotenv.config();
 
@@ -14,8 +15,55 @@ const DB_FILE = process.env.DB_PATH || path.join(process.cwd(), "db.json");
 
 app.use(express.json({ limit: "50mb" }));
 
-// Initialize DB with seed data if empty
-function loadState() {
+const MONGODB_URI = process.env.MONGODB_URI;
+let dbCollection: any = null;
+
+async function initDb() {
+  if (MONGODB_URI) {
+    try {
+      const client = new MongoClient(MONGODB_URI);
+      await client.connect();
+      const db = client.db("vlsap");
+      dbCollection = db.collection("state");
+      console.log("Connected successfully to MongoDB Atlas!");
+    } catch (e: any) {
+      console.error("Failed to connect to MongoDB, falling back to local file:", e.message);
+    }
+  }
+}
+
+initDb();
+
+async function loadState() {
+  if (MONGODB_URI && dbCollection) {
+    try {
+      const doc = await dbCollection.findOne({ _id: "app_state" });
+      if (doc) {
+        const { _id, ...state } = doc;
+        return state;
+      } else {
+        const initialState = {
+          images: getFullPilotImages(),
+          audits: getInitialMockAudits(), // Seed realistic audits so agreement stats are fully populated and active immediately!
+          raters: ["Rater A", "Rater B", "Rater C", "Rater D", "Rater E"],
+          auditorProfiles: {}, // Seed demographics profiles map
+          projects: [
+            { id: "proj-1", name: "VLSAP Calibration Micro-Pilot", description: "Inaugural IRR study on Domain 2 & 3 judgment variables.", createdAt: new Date().toISOString() }
+          ],
+          currentProject: "VLSAP Calibration Micro-Pilot",
+          calibrationPhase: "Cold Read",
+          googleApiKey: "",
+          googleDriveFolderId: "1ENECfT_ETGATB4533yAEKRZ-HugbMbad",
+          instrumentLocked: false
+        };
+        await dbCollection.insertOne({ _id: "app_state", ...initialState });
+        return initialState;
+      }
+    } catch (error: any) {
+      console.error("Error reading from MongoDB, falling back to local file:", error.message);
+    }
+  }
+
   const dir = path.dirname(DB_FILE);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -63,7 +111,16 @@ function loadState() {
   }
 }
 
-function saveState(state: any) {
+async function saveState(state: any) {
+  if (MONGODB_URI && dbCollection) {
+    try {
+      await dbCollection.replaceOne({ _id: "app_state" }, { ...state }, { upsert: true });
+      return;
+    } catch (error: any) {
+      console.error("Error writing to MongoDB:", error.message);
+    }
+  }
+
   const dir = path.dirname(DB_FILE);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -72,13 +129,13 @@ function saveState(state: any) {
 }
 
 // REST API Routes
-app.get("/api/state", (req, res) => {
-  const state = loadState();
+app.get("/api/state", async (req, res) => {
+  const state = await loadState();
   res.json(state);
 });
 
-app.post("/api/settings", (req, res) => {
-  const state = loadState();
+app.post("/api/settings", async (req, res) => {
+  const state = await loadState();
   const { raters, currentProject, calibrationPhase, googleApiKey, googleDriveFolderId, instrumentLocked, auditorProfiles } = req.body;
   
   if (raters !== undefined) state.raters = raters;
@@ -89,12 +146,12 @@ app.post("/api/settings", (req, res) => {
   if (instrumentLocked !== undefined) state.instrumentLocked = instrumentLocked;
   if (auditorProfiles !== undefined) state.auditorProfiles = auditorProfiles;
   
-  saveState(state);
+  await saveState(state);
   res.json({ success: true, state });
 });
 
-app.post("/api/audits/save", (req, res) => {
-  const state = loadState();
+app.post("/api/audits/save", async (req, res) => {
+  const state = await loadState();
   const newRecord = req.body; // Expects an AuditRecord
   
   if (!newRecord.imageId || !newRecord.auditorId || !newRecord.variableId) {
@@ -123,19 +180,19 @@ app.post("/api/audits/save", (req, res) => {
     state.audits.push(updatedRecord);
   }
 
-  saveState(state);
+  await saveState(state);
   res.json({ success: true, record: updatedRecord });
 });
 
-app.post("/api/audits/clear", (req, res) => {
-  const state = loadState();
+app.post("/api/audits/clear", async (req, res) => {
+  const state = await loadState();
   state.audits = [];
-  saveState(state);
+  await saveState(state);
   res.json({ success: true });
 });
 
 app.post("/api/images/sync", async (req, res) => {
-  const state = loadState();
+  const state = await loadState();
   const apiKey = req.body.apiKey || state.googleApiKey;
   const folderId = req.body.folderId || state.googleDriveFolderId || "1ENECfT_ETGATB4533yAEKRZ-HugbMbad";
   
@@ -200,7 +257,7 @@ app.post("/api/images/sync", async (req, res) => {
     state.images = updatedImages;
     state.googleApiKey = apiKey;
     state.googleDriveFolderId = folderId;
-    saveState(state);
+    await saveState(state);
 
     return res.json({
       success: true,
@@ -219,7 +276,7 @@ app.post("/api/images/sync", async (req, res) => {
 
 // Proxy route to fetch Google Drive image and stream it to avoid CORS/access/download restrictions!
 app.get("/api/drive/image/:id", async (req, res) => {
-  const state = loadState();
+  const state = await loadState();
   const fileId = req.params.id;
   const apiKey = state.googleApiKey;
 
@@ -260,7 +317,7 @@ app.post("/api/gemini/audit", async (req, res) => {
   if (!geminiKey) {
     // Simulated AI audit fallback if no key is configured
     const mockRatings = simulateGeminiAudit(imageId);
-    const state = loadState();
+    const state = await loadState();
     
     // Save these ratings as "Gemini-3.5" auditor
     mockRatings.forEach((rating) => {
@@ -290,7 +347,7 @@ app.post("/api/gemini/audit", async (req, res) => {
       else state.audits.push(rec);
     });
 
-    saveState(state);
+    await saveState(state);
     return res.json({
       success: true,
       isSimulation: true,
@@ -380,7 +437,7 @@ Make sure you adhere to physical evidence and the logical dependencies (e.g., if
     const ratings = auditData.ratings || [];
 
     // Save to server database as "Gemini-3.5-Flash"
-    const state = loadState();
+    const state = await loadState();
     ratings.forEach((rating: any) => {
       const idx = state.audits.findIndex(
         (a: any) =>
@@ -410,7 +467,7 @@ Make sure you adhere to physical evidence and the logical dependencies (e.g., if
       else state.audits.push(record);
     });
 
-    saveState(state);
+    await saveState(state);
 
     return res.json({
       success: true,
@@ -423,7 +480,7 @@ Make sure you adhere to physical evidence and the logical dependencies (e.g., if
     
     // Fall back to high-fidelity simulated AI ratings to maintain application capability
     const mockRatings = simulateGeminiAudit(imageId);
-    const state = loadState();
+    const state = await loadState();
     
     // Save these ratings as "Gemini-3.5" auditor so the user can see comparison stats
     mockRatings.forEach((rating) => {
@@ -453,7 +510,7 @@ Make sure you adhere to physical evidence and the logical dependencies (e.g., if
       else state.audits.push(rec);
     });
 
-    saveState(state);
+    await saveState(state);
 
     return res.json({
       success: true,
