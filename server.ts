@@ -39,17 +39,18 @@ async function loadState() {
     try {
       const doc = await dbCollection.findOne({ _id: "app_state" });
       
-      // Load db.json from disk to check if it has updated images
+      // Load bundled db.json from the repository code to check for newly imported local images
       let diskImages = [];
-      if (fs.existsSync(DB_FILE)) {
+      const BUNDLED_DB = path.join(process.cwd(), "db.json");
+      if (fs.existsSync(BUNDLED_DB)) {
         try {
-          const diskContent = fs.readFileSync(DB_FILE, "utf-8");
+          const diskContent = fs.readFileSync(BUNDLED_DB, "utf-8");
           const diskState = JSON.parse(diskContent);
           if (diskState && diskState.images) {
             diskImages = diskState.images;
           }
         } catch (e) {
-          console.error("Failed to read DB_FILE from disk:", e);
+          console.error("Failed to read BUNDLED_DB from disk:", e);
         }
       }
 
