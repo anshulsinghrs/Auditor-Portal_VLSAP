@@ -81,7 +81,9 @@ async function loadState() {
           googleApiKey: "",
           googleDriveFolderId: "1ENECfT_ETGATB4533yAEKRZ-HugbMbad",
           instrumentLocked: false,
-          auditorImages: {}
+          auditorImages: {},
+          autoAssignEnabled: true,
+          autoAssignCount: 25
         };
         await dbCollection.insertOne({ _id: "app_state", ...initialState });
         return initialState;
@@ -110,7 +112,9 @@ async function loadState() {
       googleApiKey: "",
       googleDriveFolderId: "1ENECfT_ETGATB4533yAEKRZ-HugbMbad",
       instrumentLocked: false,
-      auditorImages: {}
+      auditorImages: {},
+      autoAssignEnabled: true,
+      autoAssignCount: 25
     };
     fs.writeFileSync(DB_FILE, JSON.stringify(initialState, null, 2));
     return initialState;
@@ -133,7 +137,9 @@ async function loadState() {
       googleApiKey: "",
       googleDriveFolderId: "1ENECfT_ETGATB4533yAEKRZ-HugbMbad",
       instrumentLocked: false,
-      auditorImages: {}
+      auditorImages: {},
+      autoAssignEnabled: true,
+      autoAssignCount: 25
     };
     fs.writeFileSync(DB_FILE, JSON.stringify(fallback, null, 2));
     return fallback;
@@ -165,7 +171,7 @@ app.get("/api/state", async (req, res) => {
 
 app.post("/api/settings", async (req, res) => {
   const state = await loadState();
-  const { raters, currentProject, calibrationPhase, googleApiKey, googleDriveFolderId, instrumentLocked, auditorProfiles } = req.body;
+  const { raters, currentProject, calibrationPhase, googleApiKey, googleDriveFolderId, instrumentLocked, auditorProfiles, autoAssignEnabled, autoAssignCount } = req.body;
   
   if (raters !== undefined) state.raters = raters;
   if (currentProject !== undefined) state.currentProject = currentProject;
@@ -174,6 +180,8 @@ app.post("/api/settings", async (req, res) => {
   if (googleDriveFolderId !== undefined) state.googleDriveFolderId = googleDriveFolderId;
   if (instrumentLocked !== undefined) state.instrumentLocked = instrumentLocked;
   if (auditorProfiles !== undefined) state.auditorProfiles = auditorProfiles;
+  if (autoAssignEnabled !== undefined) state.autoAssignEnabled = autoAssignEnabled;
+  if (autoAssignCount !== undefined) state.autoAssignCount = autoAssignCount;
   
   await saveState(state);
   res.json({ success: true, state });

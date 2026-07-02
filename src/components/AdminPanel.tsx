@@ -20,6 +20,8 @@ interface AdminPanelProps {
     googleApiKey?: string;
     googleDriveFolderId?: string;
     instrumentLocked?: boolean;
+    autoAssignEnabled?: boolean;
+    autoAssignCount?: number;
   }) => void;
   onTriggerDriveSync: (apiKey: string, folderId: string) => Promise<{ success: boolean; message: string }>;
   onClearAudits: () => void;
@@ -28,6 +30,8 @@ interface AdminPanelProps {
   onAssignImages: (auditorId: string, count: number) => Promise<{ success: boolean; message: string }>;
   onUnassignImages: (auditorId: string) => Promise<{ success: boolean; message: string }>;
   auditorImages: Record<string, string[]>;
+  autoAssignEnabled: boolean;
+  autoAssignCount: number;
 }
 
 export default function AdminPanel({
@@ -46,7 +50,9 @@ export default function AdminPanel({
   onResetImages,
   onAssignImages,
   onUnassignImages,
-  auditorImages
+  auditorImages,
+  autoAssignEnabled,
+  autoAssignCount
 }: AdminPanelProps) {
   const [newRater, setNewRater] = useState("");
   const [assignCountMap, setAssignCountMap] = useState<Record<string, number>>({});
@@ -567,6 +573,38 @@ export default function AdminPanel({
                 <span>{sizeStatus.message}</span>
               </div>
             )}
+
+            {/* Automatic Assignment Trigger Section */}
+            <div className="pt-2.5 border-t border-slate-200 mt-2.5 space-y-2 text-xs">
+              <span className="text-[10px] font-bold text-slate-800 uppercase font-mono tracking-wider block">Automatic Assignment Settings</span>
+              
+              <label className="flex items-center space-x-2 text-[11px] text-slate-600 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autoAssignEnabled}
+                  onChange={(e) => onSaveSettings({ autoAssignEnabled: e.target.checked })}
+                  className="rounded border-slate-350 text-slate-900 focus:ring-0"
+                />
+                <span className="font-semibold text-slate-700">Auto-assign tasks to new/unassigned raters</span>
+              </label>
+
+              {autoAssignEnabled && (
+                <div className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-200">
+                  <span className="text-[10px] text-slate-500 font-mono">Assigned subset size:</span>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min="1"
+                      max="1000"
+                      value={autoAssignCount}
+                      onChange={(e) => onSaveSettings({ autoAssignCount: Math.max(1, Number(e.target.value) || 25) })}
+                      className="w-14 bg-white border border-slate-200 rounded px-1 py-0.5 text-center font-bold text-[10px] outline-none"
+                    />
+                    <span className="text-[10px] text-slate-400 font-mono">images</span>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

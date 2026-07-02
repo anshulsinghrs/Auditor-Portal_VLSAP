@@ -69,4 +69,6 @@ export interface ServerState {
   googleDriveFolderId?: string;
   instrumentLocked: boolean;
   auditorImages?: { [auditorId: string]: string[] };
+  autoAssignEnabled?: boolean;
+  autoAssignCount?: number;
 }

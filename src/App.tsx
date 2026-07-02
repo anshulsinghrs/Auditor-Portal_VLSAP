@@ -35,6 +35,8 @@ export default function App() {
   const [googleDriveFolderId, setGoogleDriveFolderId] = useState("1ENECfT_ETGATB4533yAEKRZ-HugbMbad");
   const [instrumentLocked, setInstrumentLocked] = useState(false);
   const [auditorImages, setAuditorImages] = useState<Record<string, string[]>>({});
+  const [autoAssignEnabled, setAutoAssignEnabled] = useState(true);
+  const [autoAssignCount, setAutoAssignCount] = useState(25);
 
   // Active Session State
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -72,6 +74,8 @@ export default function App() {
         setGoogleDriveFolderId(state.googleDriveFolderId || "1ENECfT_ETGATB4533yAEKRZ-HugbMbad");
         setInstrumentLocked(state.instrumentLocked || false);
         setAuditorImages(state.auditorImages || {});
+        setAutoAssignEnabled(state.autoAssignEnabled ?? true);
+        setAutoAssignCount(state.autoAssignCount ?? 25);
       }
     } catch (e) {
       console.error("Failed to connect to full-stack server state API:", e);
@@ -100,15 +104,15 @@ export default function App() {
     localStorage.setItem("vlsap_active_view", activeView);
   }, [activeView]);
 
-  // Automatically assign 25 random images if a logged-in rater has no active assignment
+  // Automatically assign random images if a logged-in rater has no active assignment
   useEffect(() => {
-    if (!loading && auditorProfile && images.length > 0) {
+    if (!loading && autoAssignEnabled && auditorProfile && images.length > 0) {
       const assigned = auditorImages[auditorProfile];
       if (!assigned || assigned.length === 0) {
-        handleAssignImages(auditorProfile, 25);
+        handleAssignImages(auditorProfile, autoAssignCount);
       }
     }
-  }, [auditorProfile, auditorImages, loading, images]);
+  }, [auditorProfile, auditorImages, loading, images, autoAssignEnabled, autoAssignCount]);
 
   // Enforce auto-submit on page reload / unload when in active audit session
   useEffect(() => {
@@ -354,6 +358,8 @@ export default function App() {
         setGoogleDriveFolderId(data.state.googleDriveFolderId || "1ENECfT_ETGATB4533yAEKRZ-HugbMbad");
         setInstrumentLocked(data.state.instrumentLocked || false);
         setAuditorImages(data.state.auditorImages || {});
+        setAutoAssignEnabled(data.state.autoAssignEnabled ?? true);
+        setAutoAssignCount(data.state.autoAssignCount ?? 25);
       }
     } catch (e) {
       console.error("Failed to update server settings:", e);
@@ -996,6 +1002,8 @@ export default function App() {
           onAssignImages={handleAssignImages}
           onUnassignImages={handleUnassignImages}
           auditorImages={auditorImages}
+          autoAssignEnabled={autoAssignEnabled}
+          autoAssignCount={autoAssignCount}
         />
 
         {/* IRR & Calibration Statistics */}
