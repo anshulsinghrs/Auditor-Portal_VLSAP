@@ -55,8 +55,13 @@ async function loadState() {
 
       if (doc) {
         const { _id, ...state } = doc;
-        if (diskImages.length > 0 && (!state.images || state.images.length !== diskImages.length)) {
-          console.log(`Syncing MongoDB images count from ${state.images?.length || 0} to ${diskImages.length} from db.json`);
+        const hasImageChanges = !state.images || 
+          state.images.length !== diskImages.length || 
+          state.images[0]?.driveId !== diskImages[0]?.driveId || 
+          state.images[0]?.protocolA_Url !== diskImages[0]?.protocolA_Url;
+
+        if (diskImages.length > 0 && hasImageChanges) {
+          console.log(`Syncing MongoDB images (disk count: ${diskImages.length}) from db.json`);
           state.images = diskImages;
           await dbCollection.replaceOne({ _id: "app_state" }, { ...state }, { upsert: true });
         }
