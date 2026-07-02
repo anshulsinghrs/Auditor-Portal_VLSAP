@@ -12,11 +12,47 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 const DB_FILE = process.env.DB_PATH || path.join(process.cwd(), "db.json");
+// The image manifest that ships with the repo. This always lives at the project
+// root, independent of DB_PATH (which in production points at a persistent disk
+// that starts empty). It holds the curated pilot sample of local /images panoramas.
+const SEED_DB_FILE = path.join(process.cwd(), "db.json");
 
 app.use(express.json({ limit: "50mb" }));
 
 const MONGODB_URI = process.env.MONGODB_URI;
 let dbCollection: any = null;
+
+// Cached list of the local panorama manifest (read once from SEED_DB_FILE).
+let seedImagesCache: any[] | null = null;
+
+// Returns the pilot image manifest shipped in the repo's db.json (local
+// /images panoramas). Falls back to the synthetic placeholder set only if the
+// committed manifest cannot be read.
+function getSeedImages(): any[] {
+  if (seedImagesCache) return seedImagesCache;
+  try {
+    if (fs.existsSync(SEED_DB_FILE)) {
+      const seed = JSON.parse(fs.readFileSync(SEED_DB_FILE, "utf-8"));
+      if (seed && Array.isArray(seed.images) && seed.images.length > 0) {
+        seedImagesCache = seed.images;
+        return seedImagesCache;
+      }
+    }
+  } catch (e) {
+    console.error("Failed to read seed images from", SEED_DB_FILE, e);
+  }
+  seedImagesCache = getFullPilotImages();
+  return seedImagesCache;
+}
+
+// A manifest is "stale" if it is empty or still contains the old external
+// (Unsplash) placeholder photos rather than the local /images panoramas.
+function isStaleImageManifest(images: any): boolean {
+  if (!Array.isArray(images) || images.length === 0) return true;
+  return images.some(
+    (img: any) => typeof img?.protocolA_Url === "string" && img.protocolA_Url.includes("unsplash.com")
+  );
+}
 
 async function initDb() {
   if (MONGODB_URI) {
@@ -38,32 +74,21 @@ async function loadState() {
   if (MONGODB_URI && dbCollection) {
     try {
       const doc = await dbCollection.findOne({ _id: "app_state" });
-      
-      // Load db.json from disk to check if it has updated images
-      let diskImages = [];
-      if (fs.existsSync(DB_FILE)) {
-        try {
-          const diskContent = fs.readFileSync(DB_FILE, "utf-8");
-          const diskState = JSON.parse(diskContent);
-          if (diskState && diskState.images) {
-            diskImages = diskState.images;
-          }
-        } catch (e) {
-          console.error("Failed to read DB_FILE from disk:", e);
-        }
-      }
 
       if (doc) {
         const { _id, ...state } = doc;
-        if (diskImages.length > 0 && (!state.images || state.images.length !== diskImages.length)) {
-          console.log(`Syncing MongoDB images count from ${state.images?.length || 0} to ${diskImages.length} from db.json`);
-          state.images = diskImages;
+        // Self-heal: replace an empty or placeholder (Unsplash) manifest with
+        // the local pilot panoramas shipped in the repo's db.json.
+        if (isStaleImageManifest(state.images)) {
+          const seedImages = getSeedImages();
+          console.log(`Reseeding MongoDB image manifest from ${state.images?.length || 0} to ${seedImages.length} local panoramas.`);
+          state.images = seedImages;
           await dbCollection.replaceOne({ _id: "app_state" }, { ...state }, { upsert: true });
         }
         return state;
       } else {
         const initialState = {
-          images: getFullPilotImages(),
+          images: getSeedImages(),
           audits: getInitialMockAudits(), // Seed realistic audits so agreement stats are fully populated and active immediately!
           raters: ["Rater A", "Rater B", "Rater C", "Rater D", "Rater E"],
           auditorProfiles: {}, // Seed demographics profiles map
@@ -91,7 +116,7 @@ async function loadState() {
 
   if (!fs.existsSync(DB_FILE)) {
     const initialState = {
-      images: getFullPilotImages(),
+      images: getSeedImages(),
       audits: getInitialMockAudits(), // Seed realistic audits so agreement stats are fully populated and active immediately!
       raters: ["Rater A", "Rater B", "Rater C", "Rater D", "Rater E"],
       auditorProfiles: {}, // Seed demographics profiles map
@@ -109,11 +134,21 @@ async function loadState() {
   }
   try {
     const content = fs.readFileSync(DB_FILE, "utf-8");
-    return JSON.parse(content);
+    const state = JSON.parse(content);
+    // Self-heal: an already-persisted DB (e.g. a production disk seeded before
+    // the local panoramas existed) may still hold the placeholder Unsplash
+    // manifest. Replace it with the local pilot images shipped in the repo.
+    if (isStaleImageManifest(state.images)) {
+      const seedImages = getSeedImages();
+      console.log(`Reseeding local DB image manifest from ${state.images?.length || 0} to ${seedImages.length} local panoramas.`);
+      state.images = seedImages;
+      fs.writeFileSync(DB_FILE, JSON.stringify(state, null, 2));
+    }
+    return state;
   } catch (error) {
     console.error("Error reading database file, resetting:", error);
     const fallback = {
-      images: getFullPilotImages(),
+      images: getSeedImages(),
       audits: getInitialMockAudits(),
       raters: ["Rater A", "Rater B", "Rater C", "Rater D", "Rater E"],
       auditorProfiles: {},
