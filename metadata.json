@@ -1,0 +1,6 @@
+{
+  "name": "Vision-Language Street Audit Platform (VLSAP)",
+  "description": "A research-grade academic software platform for collecting human benchmark annotations of Google Street View panoramas, supporting calibration studies, inter-rater reliability analysis, benchmark dataset creation, and future human-versus-Gemini comparison experiments.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
