@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { 
   Compass, LayoutDashboard, Settings, Award, ArrowLeft, ArrowRight, Upload, Sparkles, 
-  UserCheck, Eye, RefreshCw, Layers, User, Bot, ShieldCheck, LogOut
+  UserCheck, Eye, RefreshCw, Layers, User, Bot, ShieldCheck, LogOut, Shuffle
 } from "lucide-react";
 import RaterInstructions from "./components/RaterInstructions";
 import ImageViewer from "./components/ImageViewer";
@@ -615,6 +615,19 @@ export default function App() {
                     className="p-1 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 rounded text-slate-700 transition-colors cursor-pointer border border-slate-200/60"
                   >
                     <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      if (images.length === 0) return;
+                      const randomIndex = Math.floor(Math.random() * images.length);
+                      setCurrentImageIndex(randomIndex);
+                    }}
+                    title="Jump to a Random Panorama"
+                    className="p-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded transition-colors cursor-pointer border border-amber-200/60 flex items-center space-x-1 text-[10px] font-semibold font-mono"
+                  >
+                    <Shuffle className="h-3 w-3" />
+                    <span>Random</span>
                   </button>
                 </div>
               </div>
