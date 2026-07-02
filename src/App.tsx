@@ -34,11 +34,21 @@ export default function App() {
   const [googleApiKey, setGoogleApiKey] = useState("");
   const [googleDriveFolderId, setGoogleDriveFolderId] = useState("1ENECfT_ETGATB4533yAEKRZ-HugbMbad");
   const [instrumentLocked, setInstrumentLocked] = useState(false);
+  const [auditorImages, setAuditorImages] = useState<Record<string, string[]>>({});
 
   // Active Session State
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isAiAuditing, setIsAiAuditing] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+
+  // Filtered images list assigned to the logged-in auditor
+  const activeImages = React.useMemo(() => {
+    if (auditorProfile && auditorImages[auditorProfile] && auditorImages[auditorProfile].length > 0) {
+      const assignedIds = auditorImages[auditorProfile];
+      return images.filter((img) => assignedIds.includes(img.id));
+    }
+    return images;
+  }, [images, auditorProfile, auditorImages]);
 
   // Variables definitions (loaded from JSON)
   const variables = variablesData as VLSAPVariable[];
@@ -57,6 +67,7 @@ export default function App() {
         setGoogleApiKey(state.googleApiKey || "");
         setGoogleDriveFolderId(state.googleDriveFolderId || "1ENECfT_ETGATB4533yAEKRZ-HugbMbad");
         setInstrumentLocked(state.instrumentLocked || false);
+        setAuditorImages(state.auditorImages || {});
       }
     } catch (e) {
       console.error("Failed to connect to full-stack server state API:", e);
@@ -213,6 +224,7 @@ export default function App() {
         setGoogleApiKey(data.state.googleApiKey || "");
         setGoogleDriveFolderId(data.state.googleDriveFolderId || "1ENECfT_ETGATB4533yAEKRZ-HugbMbad");
         setInstrumentLocked(data.state.instrumentLocked || false);
+        setAuditorImages(data.state.auditorImages || {});
       }
     } catch (e) {
       console.error("Failed to update server settings:", e);
@@ -279,6 +291,48 @@ export default function App() {
         return { success: true, message: data.message };
       }
       return { success: false, message: data.error || "Failed to reset catalog." };
+    } catch (e: any) {
+      console.error(e);
+      return { success: false, message: e.message || "Network error occurred." };
+    }
+  };
+
+  // Assign a custom number of random images to a specific auditor
+  const handleAssignImages = async (auditorId: string, count: number) => {
+    try {
+      const res = await fetch("/api/images/assign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ auditorId, count })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAuditorImages(data.state.auditorImages || {});
+        setCurrentImageIndex(0); // reset page index to first image of new queue
+        return { success: true, message: data.message };
+      }
+      return { success: false, message: data.error || "Failed to assign images." };
+    } catch (e: any) {
+      console.error(e);
+      return { success: false, message: e.message || "Network error occurred." };
+    }
+  };
+
+  // Unassign custom images queue for a specific auditor, restoring full catalog
+  const handleUnassignImages = async (auditorId: string) => {
+    try {
+      const res = await fetch("/api/images/unassign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ auditorId })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAuditorImages(data.state.auditorImages || {});
+        setCurrentImageIndex(0);
+        return { success: true, message: data.message };
+      }
+      return { success: false, message: data.error || "Failed to clear assignment." };
     } catch (e: any) {
       console.error(e);
       return { success: false, message: e.message || "Network error occurred." };
@@ -382,7 +436,7 @@ export default function App() {
 
   // Get active answers for current image and auditor in the active calibration phase
   const activeAnswers = React.useMemo(() => {
-    const activeImage = images[currentImageIndex];
+    const activeImage = activeImages[currentImageIndex];
     const activeRater = auditorProfile || "Rater A";
     if (!activeImage) return {};
 
@@ -399,18 +453,18 @@ export default function App() {
       map[a.variableId] = { value: a.value, confidence: a.confidence, comment: a.comment };
     });
     return map;
-  }, [audits, images, currentImageIndex, auditorProfile, calibrationPhase]);
+  }, [audits, activeImages, currentImageIndex, auditorProfile, calibrationPhase]);
 
   // Compute auditor progress
   const auditorProgress = React.useMemo(() => {
-    if (!auditorProfile) return { completed: 0, total: images.length };
+    if (!auditorProfile) return { completed: 0, total: activeImages.length };
     const completedImageIds = new Set(
       audits
         .filter((a) => a.auditorId === auditorProfile && a.mode === (calibrationPhase === "Reconciliation" ? "Validation" : calibrationPhase))
         .map((a) => a.imageId)
     );
-    return { completed: completedImageIds.size, total: images.length };
-  }, [audits, auditorProfile, images, calibrationPhase]);
+    return { completed: completedImageIds.size, total: activeImages.length };
+  }, [audits, auditorProfile, activeImages, calibrationPhase]);
 
   // Retrieve active designation from cache at top level (prevents React hook order violation)
   const activeDesignation = React.useMemo(() => {
@@ -619,7 +673,7 @@ export default function App() {
                   <span className="bg-emerald-100 border border-emerald-200 text-emerald-700 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase">
                     ACTIVE SEGMENT
                   </span>
-                  <span>{currentImageIndex + 1} of {images.length} Panoramas</span>
+                  <span>{currentImageIndex + 1} of {activeImages.length} Panoramas</span>
                 </div>
 
                 <div className="flex items-center space-x-1.5">
@@ -632,7 +686,7 @@ export default function App() {
                   </button>
 
                   <div className="flex space-x-0.5 max-w-[240px] overflow-x-auto py-0.5 px-1 bg-slate-50 rounded border border-slate-200/60">
-                    {images.map((img, idx) => (
+                    {activeImages.map((img, idx) => (
                       <button
                         key={img.id}
                         onClick={() => setCurrentImageIndex(idx)}
@@ -648,8 +702,8 @@ export default function App() {
                   </div>
 
                   <button
-                    onClick={() => setCurrentImageIndex((prev) => Math.min(images.length - 1, prev + 1))}
-                    disabled={currentImageIndex === images.length - 1}
+                    onClick={() => setCurrentImageIndex((prev) => Math.min(activeImages.length - 1, prev + 1))}
+                    disabled={currentImageIndex === activeImages.length - 1}
                     className="p-1 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 rounded text-slate-700 transition-colors cursor-pointer border border-slate-200/60"
                   >
                     <ArrowRight className="h-3.5 w-3.5" />
@@ -657,8 +711,8 @@ export default function App() {
 
                   <button
                     onClick={() => {
-                      if (images.length === 0) return;
-                      const randomIndex = Math.floor(Math.random() * images.length);
+                      if (activeImages.length === 0) return;
+                      const randomIndex = Math.floor(Math.random() * activeImages.length);
                       setCurrentImageIndex(randomIndex);
                     }}
                     title="Jump to a Random Panorama"
@@ -671,12 +725,12 @@ export default function App() {
               </div>
 
               {/* Split layout: Image + Survey */}
-              {images[currentImageIndex] ? (
+              {activeImages[currentImageIndex] ? (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
                   {/* Left: Viewport */}
                   <div className="lg:col-span-7 space-y-2.5">
                     <ImageViewer
-                      image={images[currentImageIndex]}
+                      image={activeImages[currentImageIndex]}
                     />
                   </div>
 
@@ -684,7 +738,7 @@ export default function App() {
                   <div className="lg:col-span-5 h-[710px]">
                     <AuditForm
                       variables={variables}
-                      currentImageId={images[currentImageIndex].id}
+                      currentImageId={activeImages[currentImageIndex].id}
                       activeRater={auditorProfile}
                       activeMode={calibrationPhase === "Reconciliation" ? "Validation" : calibrationPhase}
                       answers={activeAnswers}
@@ -795,6 +849,9 @@ export default function App() {
           onClearAudits={handleClearAudits}
           onShuffleImages={handleShuffleImages}
           onResetImages={handleResetImages}
+          onAssignImages={handleAssignImages}
+          onUnassignImages={handleUnassignImages}
+          auditorImages={auditorImages}
         />
 
         {/* IRR & Calibration Statistics */}

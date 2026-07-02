@@ -68,4 +68,5 @@ export interface ServerState {
   googleApiKey: string;
   googleDriveFolderId?: string;
   instrumentLocked: boolean;
+  auditorImages?: { [auditorId: string]: string[] };
 }

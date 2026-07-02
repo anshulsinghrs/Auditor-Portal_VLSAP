@@ -80,7 +80,8 @@ async function loadState() {
           calibrationPhase: "Cold Read",
           googleApiKey: "",
           googleDriveFolderId: "1ENECfT_ETGATB4533yAEKRZ-HugbMbad",
-          instrumentLocked: false
+          instrumentLocked: false,
+          auditorImages: {}
         };
         await dbCollection.insertOne({ _id: "app_state", ...initialState });
         return initialState;
@@ -108,7 +109,8 @@ async function loadState() {
       calibrationPhase: "Cold Read",
       googleApiKey: "",
       googleDriveFolderId: "1ENECfT_ETGATB4533yAEKRZ-HugbMbad",
-      instrumentLocked: false
+      instrumentLocked: false,
+      auditorImages: {}
     };
     fs.writeFileSync(DB_FILE, JSON.stringify(initialState, null, 2));
     return initialState;
@@ -130,7 +132,8 @@ async function loadState() {
       calibrationPhase: "Cold Read",
       googleApiKey: "",
       googleDriveFolderId: "1ENECfT_ETGATB4533yAEKRZ-HugbMbad",
-      instrumentLocked: false
+      instrumentLocked: false,
+      auditorImages: {}
     };
     fs.writeFileSync(DB_FILE, JSON.stringify(fallback, null, 2));
     return fallback;
@@ -283,6 +286,72 @@ app.post("/api/images/reset", async (req, res) => {
   await saveState(state);
   res.json({ success: true, message: `Restored full catalog of ${fullImages.length} images.`, images: fullImages });
 });
+
+app.post("/api/images/assign", async (req, res) => {
+  const { auditorId, count } = req.body;
+  const assignCount = Number(count) || 25;
+  if (!auditorId) {
+    return res.status(400).json({ error: "Auditor ID is required." });
+  }
+
+  const state = await loadState();
+  if (!state.auditorImages) {
+    state.auditorImages = {};
+  }
+
+  // Load from the bundled db.json (full pool of images)
+  let fullImages = [];
+  const BUNDLED_DB = path.join(process.cwd(), "db.json");
+  if (fs.existsSync(BUNDLED_DB)) {
+    try {
+      const diskContent = fs.readFileSync(BUNDLED_DB, "utf-8");
+      const diskState = JSON.parse(diskContent);
+      if (diskState && diskState.images) {
+        fullImages = diskState.images;
+      }
+    } catch (e) {
+      console.error("Failed to read bundled db.json:", e);
+    }
+  }
+
+  if (fullImages.length === 0) {
+    fullImages = state.images;
+  }
+
+  if (fullImages.length === 0) {
+    return res.status(400).json({ error: "No images found in catalog to assign." });
+  }
+
+  // Fisher-Yates Shuffle
+  const shuffled = [...fullImages];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+
+  // Take first N image IDs
+  const assignedIds = shuffled.slice(0, assignCount).map(img => img.id);
+  state.auditorImages[auditorId] = assignedIds;
+
+  await saveState(state);
+  res.json({ success: true, message: `Assigned ${assignedIds.length} random images to ${auditorId}.`, state });
+});
+
+app.post("/api/images/unassign", async (req, res) => {
+  const { auditorId } = req.body;
+  if (!auditorId) {
+    return res.status(400).json({ error: "Auditor ID is required." });
+  }
+
+  const state = await loadState();
+  if (state.auditorImages && state.auditorImages[auditorId]) {
+    delete state.auditorImages[auditorId];
+  }
+
+  await saveState(state);
+  res.json({ success: true, message: `Restored full catalog queue for ${auditorId}.`, state });
+});
+
 
 app.post("/api/images/sync", async (req, res) => {
   const state = await loadState();

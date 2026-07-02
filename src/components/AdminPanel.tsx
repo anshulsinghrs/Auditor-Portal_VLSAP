@@ -25,6 +25,9 @@ interface AdminPanelProps {
   onClearAudits: () => void;
   onShuffleImages: (count: number) => Promise<{ success: boolean; message: string }>;
   onResetImages: () => Promise<{ success: boolean; message: string }>;
+  onAssignImages: (auditorId: string, count: number) => Promise<{ success: boolean; message: string }>;
+  onUnassignImages: (auditorId: string) => Promise<{ success: boolean; message: string }>;
+  auditorImages: Record<string, string[]>;
 }
 
 export default function AdminPanel({
@@ -40,9 +43,13 @@ export default function AdminPanel({
   onTriggerDriveSync,
   onClearAudits,
   onShuffleImages,
-  onResetImages
+  onResetImages,
+  onAssignImages,
+  onUnassignImages,
+  auditorImages
 }: AdminPanelProps) {
   const [newRater, setNewRater] = useState("");
+  const [assignCountMap, setAssignCountMap] = useState<Record<string, number>>({});
   const [apiKeyInput, setApiKeyInput] = useState(googleApiKey);
   const [folderIdInput, setFolderIdInput] = useState(googleDriveFolderId);
   const [syncStatus, setSyncStatus] = useState<{ type: "success" | "error" | "loading" | null; message: string }>({
@@ -328,7 +335,7 @@ export default function AdminPanel({
                         </button>
                       )}
                     </div>
-                    {details ? (
+                     {details ? (
                       <div className="text-[9px] text-slate-500 font-sans grid grid-cols-2 gap-x-2 gap-y-0.5 border-t border-slate-200/50 pt-1 mt-0.5">
                         <div>Gender: <span className="font-semibold text-slate-700">{details.gender}</span></div>
                         <div>Age: <span className="font-semibold text-slate-700">{details.age}</span></div>
@@ -338,6 +345,56 @@ export default function AdminPanel({
                     ) : (
                       <span className="text-[8px] text-slate-400 font-sans italic border-t border-slate-100 pt-0.5">Core calibration rater (no profile metadata)</span>
                     )}
+
+                    {/* Queue Assignment Sub-section */}
+                    <div className="border-t border-slate-200/50 pt-1.5 mt-1.5 flex flex-col gap-1">
+                      <div className="flex items-center justify-between text-[8px] font-sans">
+                        <span className="text-slate-500 font-semibold">Queue Scope:</span>
+                        {auditorImages[rater] && auditorImages[rater].length > 0 ? (
+                          <span className="bg-amber-100 border border-amber-200 text-amber-800 font-bold px-1 rounded-sm">
+                            Assigned {auditorImages[rater].length} images
+                          </span>
+                        ) : (
+                          <span className="bg-slate-100 border border-slate-200 text-slate-600 font-bold px-1 rounded-sm">
+                            Full Catalog
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <input
+                          type="number"
+                          min="1"
+                          max="1000"
+                          placeholder="25"
+                          value={assignCountMap[rater] ?? 25}
+                          onChange={(e) => {
+                            const val = Math.max(1, Number(e.target.value) || 25);
+                            setAssignCountMap(prev => ({ ...prev, [rater]: val }));
+                          }}
+                          className="w-10 bg-white border border-slate-200 rounded px-1 py-0.5 text-center font-bold text-[9px] outline-none"
+                        />
+                        <button
+                          onClick={async () => {
+                            const cnt = assignCountMap[rater] ?? 25;
+                            await onAssignImages(rater, cnt);
+                          }}
+                          className="px-1.5 py-0.5 bg-slate-900 text-white font-bold text-[9px] rounded hover:bg-slate-800 cursor-pointer"
+                        >
+                          Assign
+                        </button>
+                        {auditorImages[rater] && auditorImages[rater].length > 0 && (
+                          <button
+                            onClick={async () => {
+                              await onUnassignImages(rater);
+                            }}
+                            className="px-1.5 py-0.5 bg-white border border-slate-200 text-red-600 hover:text-red-700 font-bold text-[9px] rounded cursor-pointer"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 );
               });
