@@ -12,6 +12,8 @@ interface AuditFormProps {
     variableId: string, 
     data: { value: string; confidence: number; comment: string }
   ) => void;
+  onNextSegment: () => void;
+  isLastSegment: boolean;
 }
 
 export default function AuditForm({
@@ -20,7 +22,9 @@ export default function AuditForm({
   activeRater,
   activeMode,
   answers,
-  onSaveAnswer
+  onSaveAnswer,
+  onNextSegment,
+  isLastSegment
 }: AuditFormProps) {
   // Collapsed states per domain
   const [collapsedDomains, setCollapsedDomains] = useState<Record<string, boolean>>({
@@ -258,6 +262,16 @@ export default function AuditForm({
             </div>
           );
         })}
+      </div>
+
+      {/* Submit & Next Button */}
+      <div className="pt-3.5 border-t border-slate-200 mt-3 flex justify-end">
+        <button
+          onClick={onNextSegment}
+          className="w-full sm:w-auto px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-[11px] rounded transition-colors cursor-pointer border border-slate-950 flex items-center justify-center gap-1.5 shadow-sm font-mono tracking-wide"
+        >
+          {isLastSegment ? "Submit & Complete Session" : "Submit & Next Panorama"}
+        </button>
       </div>
 
       {/* Codebook Definitions Modal */}

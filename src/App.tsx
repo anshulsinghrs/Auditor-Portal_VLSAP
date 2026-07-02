@@ -110,6 +110,18 @@ export default function App() {
     }
   }, [auditorProfile, auditorImages, loading, images]);
 
+  // Enforce auto-submit on page reload / unload when in active audit session
+  useEffect(() => {
+    const handleUnload = () => {
+      const currentImage = activeImages[currentImageIndex];
+      if (currentImage && auditorProfile) {
+        ensureAllVariablesSubmitted(currentImage.id);
+      }
+    };
+    window.addEventListener("beforeunload", handleUnload);
+    return () => window.removeEventListener("beforeunload", handleUnload);
+  }, [currentImageIndex, activeImages, auditorProfile]);
+
   const handleAcceptInstructions = () => {
     localStorage.setItem("vlsap_instructions_accepted", "true");
     setShowInstructions(false);
@@ -153,8 +165,111 @@ export default function App() {
     handleSelectProfile(cleanRaterId);
   };
 
+  // Helper to ensure all variables for a given image are submitted (filling in default values for skipped/unanswered ones)
+  const ensureAllVariablesSubmitted = async (imageId: string) => {
+    if (!auditorProfile || !imageId) return;
+    const activeRater = auditorProfile;
+    const mode = calibrationPhase === "Reconciliation" ? "Validation" : calibrationPhase;
+
+    // Find variables that do not have answers for this image + rater + mode
+    const missingVariables = variables.filter((v) => {
+      const existing = audits.find(
+        (a) =>
+          a.imageId === imageId &&
+          a.auditorId === activeRater &&
+          a.variableId === v.id &&
+          a.mode === mode &&
+          a.protocol === "A"
+      );
+      return !existing;
+    });
+
+    if (missingVariables.length === 0) return;
+
+    // For each missing variable, construct and send a save request
+    const promises = missingVariables.map(async (v) => {
+      let defaultValue = v.options[0];
+      if (v.options.includes("Unknown")) defaultValue = "Unknown";
+      else if (v.options.includes("None")) defaultValue = "None";
+      else if (v.options.includes("Absent")) defaultValue = "Absent";
+      else if (v.options.includes("N/A")) defaultValue = "N/A";
+
+      const newRecord = {
+        imageId: imageId,
+        driveId: activeImages.find(img => img.id === imageId)?.driveId || `local-${imageId}`,
+        auditorId: activeRater,
+        auditVersion: "1.0.0",
+        instrumentVersion: "VLSAP-Pilot-v1",
+        variableId: v.id,
+        value: defaultValue,
+        confidence: 3, // neutral confidence
+        comment: "Auto-submitted (unanswered variable on progress transition)",
+        mode: mode,
+        protocol: "A"
+      };
+
+      // Save locally in state
+      setAudits((prev) => {
+        const idx = prev.findIndex(
+          (a) =>
+            a.imageId === newRecord.imageId &&
+            a.auditorId === newRecord.auditorId &&
+            a.variableId === newRecord.variableId &&
+            a.mode === newRecord.mode &&
+            a.protocol === newRecord.protocol
+        );
+        const updated = {
+          ...newRecord,
+          id: prev[idx]?.id || `rec-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          timestamp: new Date().toISOString()
+        } as AuditRecord;
+        
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = updated;
+          return next;
+        } else {
+          return [...prev, updated];
+        }
+      });
+
+      // Save to server
+      try {
+        await fetch("/api/audits/save", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...newRecord,
+            id: `rec-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            timestamp: new Date().toISOString()
+          })
+        });
+      } catch (e) {
+        console.error("Auto-submit failed for", v.id, e);
+      }
+    });
+
+    await Promise.all(promises);
+  };
+
+  // Safe navigation that auto-submits current image answers first
+  const navigateImage = async (newIndexOrFn: number | ((prev: number) => number)) => {
+    const currentImage = activeImages[currentImageIndex];
+    if (currentImage) {
+      await ensureAllVariablesSubmitted(currentImage.id);
+    }
+    setCurrentImageIndex((prev) => {
+      const nextIdx = typeof newIndexOrFn === "function" ? newIndexOrFn(prev) : newIndexOrFn;
+      return Math.max(0, Math.min(activeImages.length - 1, nextIdx));
+    });
+  };
+
   // Logout auditor
-  const handleLogoutAuditor = () => {
+  const handleLogoutAuditor = async () => {
+    const currentImage = activeImages[currentImageIndex];
+    if (currentImage) {
+      await ensureAllVariablesSubmitted(currentImage.id);
+    }
     setAuditorProfile(null);
     localStorage.removeItem("vlsap_auditor_profile");
   };
@@ -692,7 +807,7 @@ export default function App() {
 
                 <div className="flex items-center space-x-1.5">
                   <button
-                    onClick={() => setCurrentImageIndex((prev) => Math.max(0, prev - 1))}
+                    onClick={() => navigateImage((prev) => Math.max(0, prev - 1))}
                     disabled={currentImageIndex === 0}
                     className="p-1 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 rounded text-slate-700 transition-colors cursor-pointer border border-slate-200/60"
                   >
@@ -703,7 +818,7 @@ export default function App() {
                     {activeImages.map((img, idx) => (
                       <button
                         key={img.id}
-                        onClick={() => setCurrentImageIndex(idx)}
+                        onClick={() => navigateImage(idx)}
                         className={`h-4 w-4 rounded-sm text-[9px] font-mono flex items-center justify-center font-bold shrink-0 transition-all cursor-pointer ${
                           idx === currentImageIndex 
                             ? "bg-slate-900 text-white" 
@@ -716,7 +831,7 @@ export default function App() {
                   </div>
 
                   <button
-                    onClick={() => setCurrentImageIndex((prev) => Math.min(activeImages.length - 1, prev + 1))}
+                    onClick={() => navigateImage((prev) => Math.min(activeImages.length - 1, prev + 1))}
                     disabled={currentImageIndex === activeImages.length - 1}
                     className="p-1 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 rounded text-slate-700 transition-colors cursor-pointer border border-slate-200/60"
                   >
@@ -727,7 +842,7 @@ export default function App() {
                     onClick={() => {
                       if (activeImages.length === 0) return;
                       const randomIndex = Math.floor(Math.random() * activeImages.length);
-                      setCurrentImageIndex(randomIndex);
+                      navigateImage(randomIndex);
                     }}
                     title="Jump to a Random Panorama"
                     className="p-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded transition-colors cursor-pointer border border-amber-200/60 flex items-center space-x-1 text-[10px] font-semibold font-mono"
@@ -757,6 +872,17 @@ export default function App() {
                       activeMode={calibrationPhase === "Reconciliation" ? "Validation" : calibrationPhase}
                       answers={activeAnswers}
                       onSaveAnswer={handleSaveAnswer}
+                      onNextSegment={async () => {
+                        if (currentImageIndex === activeImages.length - 1) {
+                          const confirmExit = window.confirm("You have reached the end of your assigned segment. Save all answers and log out?");
+                          if (confirmExit) {
+                            await handleLogoutAuditor();
+                          }
+                        } else {
+                          await navigateImage((prev) => prev + 1);
+                        }
+                      }}
+                      isLastSegment={currentImageIndex === activeImages.length - 1}
                     />
                   </div>
                 </div>
