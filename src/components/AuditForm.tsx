@@ -7,7 +7,6 @@ interface AuditFormProps {
   currentImageId: string;
   activeRater: string;
   activeMode: "Training" | "Cold Read" | "Warm Read" | "Validation";
-  activeProtocol: "A" | "B";
   answers: Record<string, { value: string; confidence: number; comment: string }>;
   onSaveAnswer: (
     variableId: string, 
@@ -20,7 +19,6 @@ export default function AuditForm({
   currentImageId,
   activeRater,
   activeMode,
-  activeProtocol,
   answers,
   onSaveAnswer
 }: AuditFormProps) {

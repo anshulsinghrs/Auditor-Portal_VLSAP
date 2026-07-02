@@ -10,8 +10,6 @@ interface AiAuditPanelProps {
   raters: string[];
   currentImageIndex: number;
   onChangeImage: (index: number) => void;
-  activeProtocol: "A" | "B";
-  onToggleProtocol: (p: "A" | "B") => void;
   onTriggerGeminiAudit: () => void;
   isAiAuditing: boolean;
   onRefreshStats: () => void;
@@ -24,8 +22,6 @@ export default function AiAuditPanel({
   raters,
   currentImageIndex,
   onChangeImage,
-  activeProtocol,
-  onToggleProtocol,
   onTriggerGeminiAudit,
   isAiAuditing,
   onRefreshStats
@@ -160,8 +156,6 @@ export default function AiAuditPanel({
         <div className="lg:col-span-7">
           <ImageViewer
             image={activeImage}
-            protocol={activeProtocol}
-            onToggleProtocol={onToggleProtocol}
           />
         </div>
 
