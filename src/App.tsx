@@ -114,18 +114,6 @@ export default function App() {
     }
   }, [auditorProfile, auditorImages, loading, images, autoAssignEnabled, autoAssignCount]);
 
-  // Enforce auto-submit on page reload / unload when in active audit session
-  useEffect(() => {
-    const handleUnload = () => {
-      const currentImage = activeImages[currentImageIndex];
-      if (currentImage && auditorProfile) {
-        ensureAllVariablesSubmitted(currentImage.id);
-      }
-    };
-    window.addEventListener("beforeunload", handleUnload);
-    return () => window.removeEventListener("beforeunload", handleUnload);
-  }, [currentImageIndex, activeImages, auditorProfile]);
-
   const handleAcceptInstructions = () => {
     localStorage.setItem("vlsap_instructions_accepted", "true");
     setShowInstructions(false);
@@ -169,98 +157,8 @@ export default function App() {
     handleSelectProfile(cleanRaterId);
   };
 
-  // Helper to ensure all variables for a given image are submitted (filling in default values for skipped/unanswered ones)
-  const ensureAllVariablesSubmitted = async (imageId: string) => {
-    if (!auditorProfile || !imageId) return;
-    const activeRater = auditorProfile;
-    const mode = calibrationPhase === "Reconciliation" ? "Validation" : calibrationPhase;
-
-    // Find variables that do not have answers for this image + rater + mode
-    const missingVariables = variables.filter((v) => {
-      const existing = audits.find(
-        (a) =>
-          a.imageId === imageId &&
-          a.auditorId === activeRater &&
-          a.variableId === v.id &&
-          a.mode === mode &&
-          a.protocol === "A"
-      );
-      return !existing;
-    });
-
-    if (missingVariables.length === 0) return;
-
-    const newRecordsToSave: any[] = [];
-    const timestamp = new Date().toISOString();
-
-    missingVariables.forEach((v) => {
-      let defaultValue = v.options[0];
-      if (v.options.includes("Unknown")) defaultValue = "Unknown";
-      else if (v.options.includes("None")) defaultValue = "None";
-      else if (v.options.includes("Absent")) defaultValue = "Absent";
-      else if (v.options.includes("N/A")) defaultValue = "N/A";
-
-      const recordId = `rec-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-      const newRecord = {
-        id: recordId,
-        imageId: imageId,
-        driveId: activeImages.find(img => img.id === imageId)?.driveId || `local-${imageId}`,
-        auditorId: activeRater,
-        auditVersion: "1.0.0",
-        instrumentVersion: "VLSAP-Pilot-v1",
-        variableId: v.id,
-        value: defaultValue,
-        confidence: 3, // neutral confidence
-        comment: "Auto-submitted (unanswered variable on progress transition)",
-        mode: mode,
-        protocol: "A",
-        timestamp: timestamp
-      };
-      
-      newRecordsToSave.push(newRecord);
-    });
-
-    // Save locally in React UI state first (instant response)
-    setAudits((prev) => {
-      const next = [...prev];
-      newRecordsToSave.forEach((newRec) => {
-        const idx = next.findIndex(
-          (a) =>
-            a.imageId === newRec.imageId &&
-            a.auditorId === newRec.auditorId &&
-            a.variableId === newRec.variableId &&
-            a.mode === newRec.mode &&
-            a.protocol === newRec.protocol
-        );
-        if (idx >= 0) {
-          next[idx] = newRec;
-        } else {
-          next.push(newRec);
-        }
-      });
-      return next;
-    });
-
-    // Save batch to server in a single request
-    try {
-      await fetch("/api/audits/save-batch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ records: newRecordsToSave })
-      });
-    } catch (e) {
-      console.error("Auto-submit batch failed:", e);
-    }
-  };
-
-  // Safe navigation that auto-submits current image answers first
-  const navigateImage = async (newIndexOrFn: number | ((prev: number) => number)) => {
-    const currentImage = activeImages[currentImageIndex];
-    if (currentImage) {
-      // Run the auto-submit asynchronously so that slide transitions are instant and lag-free!
-      ensureAllVariablesSubmitted(currentImage.id);
-    }
+  // Navigation that changes active image index
+  const navigateImage = (newIndexOrFn: number | ((prev: number) => number)) => {
     setCurrentImageIndex((prev) => {
       const nextIdx = typeof newIndexOrFn === "function" ? newIndexOrFn(prev) : newIndexOrFn;
       return Math.max(0, Math.min(activeImages.length - 1, nextIdx));
@@ -268,11 +166,7 @@ export default function App() {
   };
 
   // Logout auditor
-  const handleLogoutAuditor = async () => {
-    const currentImage = activeImages[currentImageIndex];
-    if (currentImage) {
-      await ensureAllVariablesSubmitted(currentImage.id);
-    }
+  const handleLogoutAuditor = () => {
     setAuditorProfile(null);
     localStorage.removeItem("vlsap_auditor_profile");
   };
@@ -922,14 +816,14 @@ export default function App() {
                       activeMode={calibrationPhase === "Reconciliation" ? "Validation" : calibrationPhase}
                       answers={activeAnswers}
                       onSaveAnswer={handleSaveAnswer}
-                      onNextSegment={async () => {
+                      onNextSegment={() => {
                         if (currentImageIndex === activeImages.length - 1) {
-                          const confirmExit = window.confirm("You have reached the end of your assigned segment. Save all answers and log out?");
+                          const confirmExit = window.confirm("You have reached the end of your assigned segment. Log out?");
                           if (confirmExit) {
-                            await handleLogoutAuditor();
+                            handleLogoutAuditor();
                           }
                         } else {
-                          await navigateImage((prev) => prev + 1);
+                          navigateImage((prev) => prev + 1);
                         }
                       }}
                       isLastSegment={currentImageIndex === activeImages.length - 1}
