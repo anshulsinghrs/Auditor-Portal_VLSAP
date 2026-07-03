@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Info, HelpCircle, ChevronDown, ChevronUp, Save, Star, AlertCircle } from "lucide-react";
+import { Info, HelpCircle, ChevronDown, ChevronUp, Save, AlertCircle } from "lucide-react";
 import { VLSAPVariable, AuditRecord } from "../types";
 
 interface AuditFormProps {
@@ -90,11 +90,6 @@ export default function AuditForm({
     }
 
     onSaveAnswer(variableId, { ...existing, value: newValue });
-  };
-
-  const handleConfidenceChange = (variableId: string, confidence: number) => {
-    const existing = answers[variableId] || { value: "", confidence: 4, comment: "" };
-    onSaveAnswer(variableId, { ...existing, confidence });
   };
 
   const handleCommentChange = (variableId: string, comment: string) => {
@@ -219,31 +214,6 @@ export default function AuditForm({
                                 Unknown
                               </button>
                             </div>
-
-                            {/* Confidence Rating (1-5 Stars) */}
-                            {ans.value !== "" && ans.value !== "N/A" && (
-                              <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between">
-                                <span className="text-[10px] font-medium text-slate-500 font-mono">Confidence:</span>
-                                <div className="flex items-center space-x-0.5">
-                                  {[1, 2, 3, 4, 5].map((stars) => (
-                                    <button
-                                      key={stars}
-                                      onClick={() => handleConfidenceChange(v.id, stars)}
-                                      className="p-0.5 hover:scale-105 transition-transform cursor-pointer"
-                                      title={`Level ${stars}`}
-                                    >
-                                      <Star 
-                                        className={`h-3.5 w-3.5 ${
-                                          stars <= ans.confidence 
-                                            ? "text-amber-400 fill-amber-400" 
-                                            : "text-slate-200"
-                                        }`} 
-                                      />
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
 
                             {/* Qualitative Comments */}
                             {ans.value !== "" && (
