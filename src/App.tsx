@@ -619,6 +619,41 @@ export default function App() {
     return localProfiles[auditorProfile]?.designation || "Auditor";
   }, [auditorProfile]);
 
+  // Handle auto-removal of auditor profile once they complete all their assigned images
+  useEffect(() => {
+    if (auditorProfile && auditorProgress.total > 0 && auditorProgress.completed === auditorProgress.total) {
+      const timer = setTimeout(async () => {
+        alert(`Congratulations ${auditorProfile}! You have successfully completed your assigned street audit task of ${auditorProgress.total} panoramas. Your profile has been finalized and removed from the active rater list.`);
+        
+        // Remove from raters list
+        const updatedRaters = raters.filter((r) => r !== auditorProfile);
+        
+        // Call handleSaveSettings to persist the removal on the backend
+        await handleSaveSettings({
+          raters: updatedRaters
+        });
+
+        // Also clean up server auditorImages queue
+        try {
+          await fetch("/api/images/unassign", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ auditorId: auditorProfile })
+          });
+        } catch (e) {
+          console.error("Failed to unassign images on profile completion:", e);
+        }
+
+        // Log out and return to role selection
+        setAuditorProfile(null);
+        localStorage.removeItem("vlsap_auditor_profile");
+        setActiveView("landing");
+      }, 1000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [auditorProfile, auditorProgress.completed, auditorProgress.total, raters]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center font-sans text-gray-400">

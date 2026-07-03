@@ -3,40 +3,38 @@
     "id": "footway_present",
     "name": "Footway Presence",
     "domain": "Pedestrian Infrastructure",
-    "definition": "Is there a footway — a walking surface set apart from the road by a kerb, level change, barrier, verge, or clear change in surface material?",
-    "evidence": "A raised or delineated pedestrian surface = 1, even if broken or blocked. Road meeting building/terrain with no distinct pedestrian surface = 0. A worn dirt path or road shoulder with no kerb/delineation is not a footway = 0.",
-    "options": [
-      "0: No footway — pedestrians would use the road surface or an undelineated shoulder",
-      "1: Footway present (anywhere in view; regardless of width, condition, or whether things are on it)",
-      "9: Cannot tell (footway zone hidden/ambiguous)"
-    ]
-  },
-  {
-    "id": "crossing_present",
-    "name": "Crossing Presence",
-    "domain": "Crossing Infrastructure",
-    "definition": "Is a formal pedestrian crossing visible (zebra markings, signalised crossing, or raised crossing)?",
-    "evidence": "Painted zebra stripes, a pedestrian signal head, or a raised table crossing = 1. A junction with no pedestrian markings = 0. Faded-but-discernible stripes = 1.",
-    "options": [
-      "0: No marked crossing visible",
-      "1: Marked/formal crossing visible",
-      "9: Cannot tell"
-    ]
+    "definition": "Assess whether a designated physical footway (sidewalk, paved path, or segregated pedestrian track) exists along the street segment.",
+    "evidence": "Visible paved sidewalk, concrete path, asphalt footway, or physically segregated pedestrian corridor separated from the vehicular carriageway.",
+    "positiveExamples": [
+      "Concrete elevated sidewalk alongside residential street.",
+      "Asphalt paved path separated by green strip."
+    ],
+    "negativeExamples": [
+      "Dirt path showing wear but with no official segregation or paving.",
+      "Pedestrians sharing vehicle traffic lanes with no line or barrier separation."
+    ],
+    "unknownRule": "Rate as Unknown if the camera angle is completely blocked by vehicles, dense vegetation, or extreme lens flare such that existence of the path cannot be verified.",
+    "options": ["Present", "Absent"]
   },
   {
     "id": "usable_clear_path",
-    "name": "Usable Clear Path",
+    "name": "Usable Clear Path (0.5m)",
     "domain": "Pedestrian Infrastructure",
-    "definition": "Is there an unobstructed walking route roughly a person-width (~0.5 m) wide that a pedestrian could actually use?",
-    "evidence": "This is about usability, not existence. A footway that is fully occupied by parked vehicles/vending/goods, leaving no walkable gap = 0 even if footway_present = 1. A clear walkable strip remaining = 1. The gap between this and footway_present is the point — a footway can exist (1) with no usable path (0).",
-    "options": [
-      "0: No usable clear path — obstructions force pedestrians into the road",
-      "1: A usable clear path exists",
-      "9: Cannot tell"
+    "definition": "Determine whether there is a continuous unobstructed walking path of at least 0.5 meters wide along the footway.",
+    "evidence": "Measure clearance between structures, trees, utility poles, signposts, parking, or vending and the edge of the footway.",
+    "positiveExamples": [
+      "Clear, wide open concrete sidewalk with no objects.",
+      "Wide sidewalk with trees planted in grates, leaving >1.0m walking path."
     ],
+    "negativeExamples": [
+      "Sidewalk completely blocked by utility box, forcing pedestrians to step down.",
+      "Informal goods or motorbikes parked across the entire width of the footway."
+    ],
+    "unknownRule": "Mark Unknown if the clear width cannot be determined due to distance from camera or severe visual obstruction.",
+    "options": ["Unobstructed", "Partially Obstructed", "Blocked"],
     "requires": {
       "variableId": "footway_present",
-      "value": "1: Footway present (anywhere in view; regardless of width, condition, or whether things are on it)",
+      "value": "Present",
       "disableMessage": "Only applicable when a footway is present."
     }
   },
@@ -44,18 +42,20 @@
     "id": "effective_width",
     "name": "Effective Width",
     "domain": "Pedestrian Infrastructure",
-    "definition": "How wide is the usable walking surface (excluding parts blocked by obstructions)?",
-    "evidence": "Judge the clear usable width, not the footway's built width. [spatial] — on the stitched panorama, near-ground distortion may make this unjudgeable; use 9 if so (this is expected and informative).",
-    "options": [
-      "0: Absent — no usable footway width",
-      "1: Narrow — under ~1 m; two people cannot pass abreast (roughly less than one door-width)",
-      "2: Adequate — ~1–2 m; two can pass",
-      "3: Wide — over ~2 m; three-plus abreast comfortably",
-      "9: Cannot judge width (e.g., panorama distortion, hidden)"
+    "definition": "The average usable width of the pedestrian space, excluding obstructions, measured in bands.",
+    "evidence": "Estimate the physical width available for walking by comparing with standard human dimensions (e.g., shoulder width is ~0.5m, standard wheelchair is ~0.7m).",
+    "positiveExamples": [
+      "Wide commercial sidewalks allowing 3+ people to walk abreast (> 2.0m).",
+      "Standard residential sidewalk allowing 2 people to pass comfortably (1.5m - 2.0m)."
     ],
+    "negativeExamples": [
+      "Narrow concrete strip squeezed between wall and road drain (< 1.0m)."
+    ],
+    "unknownRule": "Use Unknown if high-angle perspective distortion makes width scaling unreliable.",
+    "options": ["< 1.0m", "1.0m - 1.5m", "1.5m - 2.0m", "> 2.0m"],
     "requires": {
       "variableId": "footway_present",
-      "value": "1: Footway present (anywhere in view; regardless of width, condition, or whether things are on it)",
+      "value": "Present",
       "disableMessage": "Only applicable when a footway is present."
     }
   },
@@ -63,18 +63,21 @@
     "id": "footway_continuity",
     "name": "Footway Continuity",
     "domain": "Pedestrian Infrastructure",
-    "definition": "Along the visible stretch, is the footway continuous or broken?",
-    "evidence": "Continuity is about interruption, not surface quality. A smooth but frequently blocked footway = 2/3. A rough but uninterrupted footway = 0.",
-    "options": [
-      "0: Continuous — walkable end-to-end in view",
-      "1: Minor breaks — occasional gaps/steps, still broadly walkable",
-      "2: Frequent breaks — repeatedly interrupted",
-      "3: Obstructed — blocked such that a pedestrian must repeatedly detour into the road",
-      "9: Cannot tell"
+    "definition": "Assess whether the footway is a continuous paved facility along the observable segment, or if it breaks, terminates abruptly, or turns into an unpaved surface.",
+    "evidence": "Observe pavement transitions, construction breaks, gaps where the footway vanishes into driveways, or unpaved mud sections.",
+    "positiveExamples": [
+      "Continuous concrete pavement stretching from intersection to intersection.",
+      "Unbroken paved sidewalk with well-integrated standard driveway ramps."
     ],
+    "negativeExamples": [
+      "Sidewalk that ends suddenly in a pile of gravel, forcing pedestrians onto the street.",
+      "Gaps of more than 5 meters of dirt/gravel within an otherwise paved street."
+    ],
+    "unknownRule": "Mark Unknown if the path disappears behind a building curve or dense vegetation at mid-block.",
+    "options": ["Continuous", "Intermittent/Broken", "No Footway"],
     "requires": {
       "variableId": "footway_present",
-      "value": "1: Footway present (anywhere in view; regardless of width, condition, or whether things are on it)",
+      "value": "Present",
       "disableMessage": "Only applicable when a footway is present."
     }
   },
@@ -82,37 +85,59 @@
     "id": "surface_condition",
     "name": "Surface Condition",
     "domain": "Pedestrian Infrastructure",
-    "definition": "What is the physical state of the walking surface?",
-    "evidence": "Judge the surface, not obstructions on it. Parked cars on a smooth footway = still 0 for surface. Cracked/heaved paving = 2. Shadow or leaf-litter that hides the surface → if you cannot see it, 9.",
-    "options": [
-      "0: Good — smooth, intact, no trip hazards",
-      "1: Fair — worn or patchy but walkable",
-      "2: Poor — broken, uneven, missing slabs, clear trip hazards",
-      "9: Cannot judge (hidden/too far/too blurred)"
+    "definition": "Rate the overall physical maintenance and structural state of the footway paving surface.",
+    "evidence": "Look for cracked concrete panels, deep potholes, loose paving stones, severe root heave, pooled water, or muddy segments.",
+    "positiveExamples": [
+      "Freshly laid asphalt or uniform interlocking brick pavers with zero cracks (Good).",
+      "Minor hairline cracks, stable joint gaps with no tripping hazards (Fair)."
     ],
+    "negativeExamples": [
+      "Shattered concrete slabs, grass growing out of deep trenches, puddles covering the path, trip hazards >2cm (Poor)."
+    ],
+    "unknownRule": "Select Unknown if the sidewalk surface is completely obscured by a thick carpet of autumn leaves, snow, sand, or shadows.",
+    "options": ["Good", "Fair", "Poor"],
     "requires": {
       "variableId": "footway_present",
-      "value": "1: Footway present (anywhere in view; regardless of width, condition, or whether things are on it)",
+      "value": "Present",
       "disableMessage": "Only applicable when a footway is present."
     }
+  },
+  {
+    "id": "crossing_present",
+    "name": "Crossing Presence",
+    "domain": "Crossing Infrastructure",
+    "definition": "Evaluate if there is a marked pedestrian crossing (zebra lines, parallel lines, or highlighted pavement) visible within the segment views.",
+    "evidence": "Paint markings on road surface, pedestrian crossing signs, or electronic pedestrian signals at junctions.",
+    "positiveExamples": [
+      "Clearly painted white zebra stripes across the asphalt.",
+      "Tactile paved crossing ramp with pedestrian lights."
+    ],
+    "negativeExamples": [
+      "An informal crossing point where pedestrians cross the busy road without markings.",
+      "A regular intersection with no pedestrian signage or street paint."
+    ],
+    "unknownRule": "Rate Unknown if the intersection area is completely out of view or severely shadowed.",
+    "options": ["Present", "Absent"]
   },
   {
     "id": "encroachment_severity",
     "name": "Encroachment Severity",
     "domain": "Pedestrian Space Occupation",
-    "definition": "To what degree is the pedestrian space taken over by non-pedestrian use (vending, parking, goods, construction)?",
-    "evidence": "Rate how much walking space is lost, regardless of cause. Use the visible occupation of the footway/pedestrian zone. (Dense market with stalls + parked cars + stacked goods and people in the road ≈ 5. A couple of parked scooters leaving a clear strip ≈ 2.)",
-    "options": [
-      "1: Negligible — little/no encroachment",
-      "2: Minor — some encroachment, most of the walking space usable",
-      "3: Moderate — about half the walking space lost",
-      "4: Severe — most of the walking space lost; walking difficult",
-      "5: Complete — walking space fully taken; pedestrians in the carriageway",
-      "9: Cannot judge"
+    "definition": "Our flagship metric. Rates the degree of pedestrian space loss due to temporary or permanent physical encroachments (vending stalls, commercial spillover, construction material, parked vehicles).",
+    "evidence": "Observe physical structures, objects, shop displays, chairs/tables, building materials, or debris resting on the footway.",
+    "positiveExamples": [
+      "Zero encroachments; the entire paved path is wide open (Level 1).",
+      "A single trash can or small potted plant slightly narrowing the path (Level 2)."
     ],
+    "negativeExamples": [
+      "Multiple dining tables and a cooking stove occupying 80% of the pavement width (Level 4).",
+      "A metal gate, construction fence, or massive vendor tent blocking 100% of the path (Level 5)."
+    ],
+    "unknownRule": "Only use Unknown if the sidewalk space is completely behind a wall or truck, preventing any view.",
+    "options": ["None (Level 1)", "Minor (Level 2)", "Moderate (Level 3)", "Severe (Level 4)", "Total Obstruction (Level 5)"],
     "requires": {
       "variableId": "footway_present",
-      "value": "1: Footway present (anywhere in view; regardless of width, condition, or whether things are on it)",
+      "value": "Present",
       "disableMessage": "Only applicable when a footway is present."
     }
   },
@@ -120,17 +145,21 @@
     "id": "parking_on_footway",
     "name": "Parking on Footway",
     "domain": "Pedestrian Space Occupation",
-    "definition": "Are vehicles parked on or over the footway / pedestrian zone?",
-    "evidence": "Only parking on/over the pedestrian surface counts here. Cars parked in a road-edge lane that do not intrude on the footway = 0 (that is a traffic-buffer matter, not encroachment).",
-    "options": [
-      "0: No parking on the pedestrian zone",
-      "1: Parking partly occupies the pedestrian zone",
-      "2: Parking substantially blocks the pedestrian zone",
-      "9: Cannot tell"
+    "definition": "Assess whether motor vehicles, motorbikes, or bicycles are parked on top of the designated pedestrian footway space.",
+    "evidence": "Cars, scooters, motorcycles, or utility vans parked on the sidewalk paver stones or designated pedestrian track.",
+    "positiveExamples": [
+      "All cars parked in roadside bays or garage driveways; zero sidewalk parking.",
+      "One scooter parked parallel at the very edge of a 3-meter-wide walk."
     ],
+    "negativeExamples": [
+      "Three SUVs parked diagonally fully occupying the pedestrian strip.",
+      "A long line of delivery motorbikes parked on the paved footway."
+    ],
+    "unknownRule": "Rate Unknown if parked vehicles are visible but it is impossible to distinguish if they are on the road shoulder or the footway.",
+    "options": ["None", "1-2 Vehicles", "3+ Vehicles"],
     "requires": {
       "variableId": "footway_present",
-      "value": "1: Footway present (anywhere in view; regardless of width, condition, or whether things are on it)",
+      "value": "Present",
       "disableMessage": "Only applicable when a footway is present."
     }
   },
@@ -138,18 +167,20 @@
     "id": "vending_intensity",
     "name": "Vending Intensity",
     "domain": "Pedestrian Space Occupation",
-    "definition": "How much do informal vendors/stalls occupy the pedestrian zone?",
-    "evidence": "Count vending occupation of the walking zone (stalls, spread goods, tarpaulins). Shopfront activity inside the building line does not count; goods/stalls on the footway do.",
-    "options": [
-      "0: None visible",
-      "1: Occasional stall, walking space largely clear",
-      "2: Frequent stalls, walking space significantly reduced",
-      "3: Continuous vending, walking space largely taken",
-      "9: Cannot tell"
+    "definition": "Rate the presence and scale of street vendors, food kiosks, informal markets, or sidewalk merchandise displays.",
+    "evidence": "Pushcarts, street kiosks, clothing racks, fruit stands, or table setups with vendors on the footway.",
+    "positiveExamples": [
+      "Clean sidewalks with zero commercial activity (None).",
+      "A single newspaper stand or shoe shine chair that leaves ample clear space (Light)."
     ],
+    "negativeExamples": [
+      "A bustling street market with double-sided vendor displays, clothing lines, and heavy foot traffic clustering around stands (Heavy)."
+    ],
+    "unknownRule": "Rate Unknown if dense pedestrian crowds completely block the ground-level view of the shops.",
+    "options": ["None", "Light", "Heavy"],
     "requires": {
       "variableId": "footway_present",
-      "value": "1: Footway present (anywhere in view; regardless of width, condition, or whether things are on it)",
+      "value": "Present",
       "disableMessage": "Only applicable when a footway is present."
     }
   },
@@ -157,44 +188,48 @@
     "id": "pedestrian_displacement",
     "name": "Pedestrian Displacement",
     "domain": "Pedestrian Space Occupation",
-    "definition": "Are pedestrians walking in the carriageway because the footway is unavailable/occupied?",
-    "evidence": "This is a consequence variable — evidence of displacement, not its cause. Judge from visible pedestrians actually in the roadway. (No pedestrians visible → 0, and note this variable is weaker when the scene is empty.)",
-    "options": [
-      "0: No — pedestrians on footway, or none visible in the road",
-      "1: Some pedestrians in the carriageway",
-      "2: Pedestrians clearly using the carriageway as the main walking route",
-      "9: Cannot tell"
-    ]
+    "definition": "Observe whether pedestrians are forced to walk in the vehicular carriageway because the footway is absent, blocked, or heavily encroached upon.",
+    "evidence": "People walking alongside vehicular traffic on the asphalt, specifically where they have to step around parked cars or vendor stalls.",
+    "positiveExamples": [
+      "All pedestrians walking safely on an unobstructed sidewalk.",
+      "No pedestrians walking in the road."
+    ],
+    "negativeExamples": [
+      "A parent pushing a stroller in the traffic lane because a parked vehicle blocks the sidewalk ramp (Forced).",
+      "Pedestrians walking in the traffic lane because there is no sidewalk provided (Forced)."
+    ],
+    "unknownRule": "Mark Unknown if no pedestrians are currently present in the scene and the physical obstructions do not make displacement mathematically certain.",
+    "options": ["No", "Yes (Observed)", "Yes (Forced due to obstacles)"]
   },
   {
     "id": "traffic_threat",
     "name": "Traffic Threat",
     "domain": "Traffic Environment",
-    "definition": "From visible cues only, how threatening is the traffic environment to a pedestrian?",
-    "evidence": "Base only on visible cues — carriageway width, number of lanes, presence/absence of buffer or calming, visible traffic mix (heavy vehicles, dense mixed traffic). Do not infer speed you cannot see. (Wide multi-lane road, buses, no footway buffer ≈ 4/5. Narrow calm lane with a buffered footway ≈ 1/2.) This variable is expected to be the least reliable — that is what we are testing.",
-    "options": [
-      "1: Low — calm, narrow, protected/buffered",
-      "2: Mild",
-      "3: Moderate",
-      "4: High",
-      "5: Severe — wide fast carriageway, heavy/mixed traffic, no protection, pedestrians exposed",
-      "9: Cannot judge"
-    ]
+    "definition": "Estimate the threat to pedestrian safety from vehicular speed and volume based solely on observable physical street design cues.",
+    "evidence": "Number of vehicular lanes, presence of speed humps, median dividers, street width, and density of heavy trucks or high-speed traffic.",
+    "positiveExamples": [
+      "A narrow, single-lane, winding residential street with speed tables (Low).",
+      "A street with heavy stop-and-go congestion where speeds are extremely low (Low)."
+    ],
+    "negativeExamples": [
+      "A wide, multi-lane arterial road without traffic calming or crossing lights, where high-speed cars dominate (High)."
+    ],
+    "unknownRule": "Mark Unknown only if vehicular carriageway is entirely out of view.",
+    "options": ["Low", "Medium", "High"]
   },
   {
     "id": "overall_walkability",
     "name": "Overall Walkability",
     "domain": "Holistic Walkability",
-    "definition": "Overall, how walkable is this location for a pedestrian?",
-    "evidence": "A single overall judgment considering everything visible. (We compare this to items 3–11 to see whether the holistic judgment agrees even where components do not.)",
-    "options": [
-      "1: Hostile / effectively unwalkable",
-      "2: Very poor",
-      "3: Poor",
-      "4: Usable but with clear problems",
-      "5: Moderate",
-      "6: Good",
-      "7: Comfortable, continuous, safe"
-    ]
+    "definition": "A comprehensive, holistic score (1-7) summarizing how comfortable, safe, and pleasant the segment is for walking.",
+    "evidence": "Consolidated evaluation of paving quality, safety from traffic, level of shade/greenery, presence of obstructions, and general accessibility.",
+    "positiveExamples": [
+      "A tree-lined boulevard, wide sidewalks, tactile pavers, physical separation, low traffic speed (7 - Excellent)."
+    ],
+    "negativeExamples": [
+      "A broken, narrow concrete strip littered with trash, blocked by vehicles, immediately adjacent to a high-speed highway with no barriers (1 - Very Poor)."
+    ],
+    "unknownRule": "Should never be marked Unknown unless the entire panorama is corrupt or unreadable.",
+    "options": ["1 (Very Poor)", "2", "3", "4", "5", "6", "7 (Excellent)"]
   }
 ]

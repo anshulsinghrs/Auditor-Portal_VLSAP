@@ -66,27 +66,14 @@ export default function AuditForm({
     const existing = answers[variableId] || { value: "", confidence: 4, comment: "" };
     
     // Custom dependency cascades
-    // E.g., if we mark "footway_present" as not present or Cannot tell, we clear/disable sub-metrics
-    if (variableId === "footway_present" && value !== "1: Footway present (anywhere in view; regardless of width, condition, or whether things are on it)") {
-      // Trigger save of children variables
+    // E.g., if we mark "footway_present" as "Absent", we clear/disable sub-metrics
+    if (variableId === "footway_present" && value === "Absent") {
+      // Trigger save of children variables as "N/A"
       variables.forEach((variable) => {
         if (variable.requires?.variableId === "footway_present") {
-          let defaultValue = variable.options[0];
-          // If footway is 9 (Cannot tell), default to 9 option if available, else first option
-          if (value.startsWith("9")) {
-            const nineOpt = variable.options.find(opt => opt.startsWith("9"));
-            if (nineOpt) defaultValue = nineOpt;
-          } else {
-            // If footway is 0 (No footway), default to appropriate 0/absent values
-            if (variable.id === "usable_clear_path") defaultValue = "0: No usable clear path — obstructions force pedestrians into the road";
-            else if (variable.id === "effective_width") defaultValue = "0: Absent — no usable footway width";
-            else if (variable.id === "footway_continuity") defaultValue = "3: Obstructed — blocked such that a pedestrian must repeatedly detour into the road";
-            else if (variable.id === "surface_condition") defaultValue = "9: Cannot judge (hidden/too far/too blurred)";
-            else if (variable.id === "encroachment_severity") defaultValue = "9: Cannot judge";
-            else if (variable.id === "parking_on_footway") defaultValue = "0: No parking on the pedestrian zone";
-            else if (variable.id === "vending_intensity") defaultValue = "0: None visible";
-          }
-          onSaveAnswer(variable.id, { value: defaultValue, confidence: 5, comment: "Automatically set based on footway presence response." });
+          let defaultValue = "N/A";
+          if (variable.id === "footway_continuity") defaultValue = "No Footway";
+          onSaveAnswer(variable.id, { value: defaultValue, confidence: 5, comment: "Automatically set due to absence of footway structure." });
         }
       });
     }
