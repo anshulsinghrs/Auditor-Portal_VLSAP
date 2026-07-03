@@ -31,6 +31,7 @@ interface AdminPanelProps {
   onAssignImages: (auditorId: string, count: number) => Promise<{ success: boolean; message: string }>;
   onUnassignImages: (auditorId: string) => Promise<{ success: boolean; message: string }>;
   auditorImages: Record<string, string[]>;
+  auditorProfiles: Record<string, any>;
   autoAssignEnabled: boolean;
   autoAssignCount: number;
 }
@@ -53,6 +54,7 @@ export default function AdminPanel({
   onAssignImages,
   onUnassignImages,
   auditorImages,
+  auditorProfiles,
   autoAssignEnabled,
   autoAssignCount
 }: AdminPanelProps) {
@@ -366,11 +368,15 @@ export default function AdminPanel({
 
           <div className="grid grid-cols-1 gap-1.5 h-32 overflow-y-auto pr-1">
             {(() => {
-              let profilesDetails: any = {};
+              let localDetails: any = {};
               try {
                 const localProfilesStr = localStorage.getItem("vlsap_auditor_profiles_details") || "{}";
-                profilesDetails = JSON.parse(localProfilesStr);
+                localDetails = JSON.parse(localProfilesStr);
               } catch (e) {}
+
+              // Prefer server-synced profiles (all devices) and fall back to this
+              // device's local cache so every auditor's details are shown.
+              const profilesDetails: any = { ...localDetails, ...(auditorProfiles || {}) };
 
               return raters.map((rater) => {
                 const details = profilesDetails[rater];

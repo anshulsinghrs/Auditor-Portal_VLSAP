@@ -36,6 +36,7 @@ export default function App() {
   const [googleDriveFolderId, setGoogleDriveFolderId] = useState("1ENECfT_ETGATB4533yAEKRZ-HugbMbad");
   const [instrumentLocked, setInstrumentLocked] = useState(false);
   const [auditorImages, setAuditorImages] = useState<Record<string, string[]>>({});
+  const [auditorProfiles, setAuditorProfiles] = useState<Record<string, any>>({});
   const [autoAssignEnabled, setAutoAssignEnabled] = useState(true);
   const [autoAssignCount, setAutoAssignCount] = useState(25);
 
@@ -76,6 +77,7 @@ export default function App() {
         setGoogleDriveFolderId(state.googleDriveFolderId || "1ENECfT_ETGATB4533yAEKRZ-HugbMbad");
         setInstrumentLocked(state.instrumentLocked || false);
         setAuditorImages(state.auditorImages || {});
+        setAuditorProfiles(state.auditorProfiles || {});
         setAutoAssignEnabled(state.autoAssignEnabled ?? true);
         setAutoAssignCount(state.autoAssignCount ?? 25);
       }
@@ -267,6 +269,7 @@ export default function App() {
         setGoogleDriveFolderId(data.state.googleDriveFolderId || "1ENECfT_ETGATB4533yAEKRZ-HugbMbad");
         setInstrumentLocked(data.state.instrumentLocked || false);
         setAuditorImages(data.state.auditorImages || {});
+        setAuditorProfiles(data.state.auditorProfiles || {});
         setAutoAssignEnabled(data.state.autoAssignEnabled ?? true);
         setAutoAssignCount(data.state.autoAssignCount ?? 25);
       }
@@ -983,6 +986,7 @@ export default function App() {
           onAssignImages={handleAssignImages}
           onUnassignImages={handleUnassignImages}
           auditorImages={auditorImages}
+          auditorProfiles={auditorProfiles}
           autoAssignEnabled={autoAssignEnabled}
           autoAssignCount={autoAssignCount}
         />

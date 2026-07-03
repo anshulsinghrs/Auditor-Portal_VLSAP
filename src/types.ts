@@ -58,6 +58,14 @@ export interface VLSAPVariable {
   };
 }
 
+export interface AuditorProfileDetails {
+  name: string;
+  gender: string;
+  designation: string;
+  age: number;
+  education: string;
+}
+
 export interface ServerState {
   images: StreetViewImage[];
   audits: AuditRecord[];
@@ -66,9 +74,11 @@ export interface ServerState {
   currentProject: string;
   calibrationPhase: "Cold Read" | "Warm Read" | "Reconciliation";
   googleApiKey: string;
+  hasGoogleApiKey?: boolean;
   googleDriveFolderId?: string;
   instrumentLocked: boolean;
   auditorImages?: { [auditorId: string]: string[] };
+  auditorProfiles?: { [auditorId: string]: AuditorProfileDetails };
   autoAssignEnabled?: boolean;
   autoAssignCount?: number;
 }

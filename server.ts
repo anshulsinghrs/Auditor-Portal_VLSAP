@@ -233,7 +233,9 @@ app.post("/api/settings", async (req, res) => {
   if (googleApiKey !== undefined) state.googleApiKey = googleApiKey;
   if (googleDriveFolderId !== undefined) state.googleDriveFolderId = googleDriveFolderId;
   if (instrumentLocked !== undefined) state.instrumentLocked = instrumentLocked;
-  if (auditorProfiles !== undefined) state.auditorProfiles = auditorProfiles;
+  // Merge (don't replace) so profiles registered on different devices accumulate
+  // server-side and the admin dashboard can see every auditor.
+  if (auditorProfiles !== undefined) state.auditorProfiles = { ...(state.auditorProfiles || {}), ...auditorProfiles };
   if (autoAssignEnabled !== undefined) state.autoAssignEnabled = autoAssignEnabled;
   if (autoAssignCount !== undefined) state.autoAssignCount = autoAssignCount;
 
