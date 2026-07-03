@@ -9,6 +9,7 @@ interface AdminPanelProps {
   audits: AuditRecord[];
   raters: string[];
   googleApiKey: string;
+  hasGoogleApiKey: boolean;
   googleDriveFolderId: string;
   instrumentLocked: boolean;
   calibrationPhase: "Cold Read" | "Warm Read" | "Reconciliation";
@@ -39,6 +40,7 @@ export default function AdminPanel({
   audits,
   raters,
   googleApiKey,
+  hasGoogleApiKey,
   googleDriveFolderId,
   instrumentLocked,
   calibrationPhase,
@@ -240,9 +242,16 @@ export default function AdminPanel({
                   type="password"
                   value={apiKeyInput}
                   onChange={(e) => setApiKeyInput(e.target.value)}
-                  placeholder="Enter Google API Key"
+                  placeholder={hasGoogleApiKey ? "A key is configured — enter a new one to replace it" : "Enter Google API Key"}
                   className="w-full bg-slate-50 border border-slate-200/85 focus:border-slate-400 rounded pl-7 pr-2.5 py-1 text-[11px] transition-all outline-none font-mono"
                 />
+                <span className={`absolute right-2 top-1.5 text-[8px] font-mono font-bold uppercase px-1 rounded-sm border ${
+                  hasGoogleApiKey
+                    ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                    : "bg-slate-100 border-slate-200 text-slate-500"
+                }`}>
+                  {hasGoogleApiKey ? "Configured" : "Not set"}
+                </span>
               </div>
 
               <div className="flex items-center space-x-1.5">

@@ -163,16 +163,70 @@ async function saveState(state: any) {
   fs.writeFileSync(DB_FILE, JSON.stringify(state, null, 2));
 }
 
+// Persist a single audit record.
+// On MongoDB the audits array is mutated atomically (match-and-$set, else $push) so two
+// raters saving at the same time cannot overwrite each other the way a full-document
+// replace would. The local-file path keeps the simple read-modify-write used for dev/offline.
+async function upsertAuditRecord(record: any) {
+  if (MONGODB_URI && dbCollection) {
+    try {
+      const matchQuery = {
+        _id: "app_state",
+        audits: {
+          $elemMatch: {
+            imageId: record.imageId,
+            auditorId: record.auditorId,
+            variableId: record.variableId,
+            mode: record.mode,
+            protocol: record.protocol
+          }
+        }
+      };
+      const setRes = await dbCollection.updateOne(matchQuery, { $set: { "audits.$": record } });
+      if (setRes.matchedCount > 0) return;
+
+      const pushRes = await dbCollection.updateOne({ _id: "app_state" }, { $push: { audits: record } });
+      if (pushRes.matchedCount > 0) return;
+      // Document not initialized yet — fall through to a full read-modify-write to seed it.
+    } catch (e: any) {
+      console.error("Atomic audit upsert failed, falling back to full save:", e.message);
+    }
+  }
+
+  const state = await loadState();
+  const index = state.audits.findIndex(
+    (a: any) =>
+      a.imageId === record.imageId &&
+      a.auditorId === record.auditorId &&
+      a.variableId === record.variableId &&
+      a.mode === record.mode &&
+      a.protocol === record.protocol
+  );
+  if (index >= 0) state.audits[index] = record;
+  else state.audits.push(record);
+  await saveState(state);
+}
+
+// Strip server-only secrets before returning state to a browser client.
+// The Google API key must never be shipped to the frontend; the server uses the
+// stored copy directly for Drive sync and the image proxy. We surface a boolean
+// instead so the admin UI can still show whether a key is configured.
+function sanitizeStateForClient(state: any) {
+  const { googleApiKey, ...rest } = state;
+  return { ...rest, googleApiKey: "", hasGoogleApiKey: !!googleApiKey };
+}
+
 // REST API Routes
 app.get("/api/state", async (req, res) => {
   const state = await loadState();
-  res.json(state);
+  res.json(sanitizeStateForClient(state));
 });
 
 app.post("/api/settings", async (req, res) => {
   const state = await loadState();
-  const { raters, currentProject, calibrationPhase, googleApiKey, googleDriveFolderId, instrumentLocked, auditorProfiles, autoAssignEnabled, autoAssignCount } = req.body;
-  
+  const { images, raters, currentProject, calibrationPhase, googleApiKey, googleDriveFolderId, instrumentLocked, auditorProfiles, autoAssignEnabled, autoAssignCount } = req.body;
+
+  if (images !== undefined) state.images = images;
   if (raters !== undefined) state.raters = raters;
   if (currentProject !== undefined) state.currentProject = currentProject;
   if (calibrationPhase !== undefined) state.calibrationPhase = calibrationPhase;
@@ -182,49 +236,31 @@ app.post("/api/settings", async (req, res) => {
   if (auditorProfiles !== undefined) state.auditorProfiles = auditorProfiles;
   if (autoAssignEnabled !== undefined) state.autoAssignEnabled = autoAssignEnabled;
   if (autoAssignCount !== undefined) state.autoAssignCount = autoAssignCount;
-  
+
   await saveState(state);
-  res.json({ success: true, state });
+  res.json({ success: true, state: sanitizeStateForClient(state) });
 });
 
 app.post("/api/audits/save", async (req, res) => {
-  const state = await loadState();
   const newRecord = req.body; // Expects an AuditRecord
-  
+
   if (!newRecord.imageId || !newRecord.auditorId || !newRecord.variableId) {
     return res.status(400).json({ error: "Missing required audit record keys." });
   }
 
-  // Find and replace existing record for same image, auditor, variable, mode, and protocol
-  const index = state.audits.findIndex(
-    (a: any) =>
-      a.imageId === newRecord.imageId &&
-      a.auditorId === newRecord.auditorId &&
-      a.variableId === newRecord.variableId &&
-      a.mode === newRecord.mode &&
-      a.protocol === newRecord.protocol
-  );
-
   const updatedRecord = {
     ...newRecord,
-    id: newRecord.id || `rec-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    id: newRecord.id || `rec-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
     timestamp: new Date().toISOString()
   };
 
-  if (index >= 0) {
-    state.audits[index] = updatedRecord;
-  } else {
-    state.audits.push(updatedRecord);
-  }
-
-  await saveState(state);
+  await upsertAuditRecord(updatedRecord);
   res.json({ success: true, record: updatedRecord });
 });
 
 app.post("/api/audits/save-batch", async (req, res) => {
-  const state = await loadState();
   const records = req.body.records;
-  
+
   if (!Array.isArray(records)) {
     return res.status(400).json({ error: "Missing required records array." });
   }
@@ -234,29 +270,15 @@ app.post("/api/audits/save-batch", async (req, res) => {
       continue;
     }
 
-    const index = state.audits.findIndex(
-      (a: any) =>
-        a.imageId === newRecord.imageId &&
-        a.auditorId === newRecord.auditorId &&
-        a.variableId === newRecord.variableId &&
-        a.mode === newRecord.mode &&
-        a.protocol === newRecord.protocol
-    );
-
     const updatedRecord = {
       ...newRecord,
-      id: newRecord.id || `rec-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: newRecord.id || `rec-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
       timestamp: new Date().toISOString()
     };
 
-    if (index >= 0) {
-      state.audits[index] = updatedRecord;
-    } else {
-      state.audits.push(updatedRecord);
-    }
+    await upsertAuditRecord(updatedRecord);
   }
 
-  await saveState(state);
   res.json({ success: true });
 });
 
@@ -381,7 +403,7 @@ app.post("/api/images/assign", async (req, res) => {
   state.auditorImages[auditorId] = assignedIds;
 
   await saveState(state);
-  res.json({ success: true, message: `Assigned ${assignedIds.length} random images to ${auditorId}.`, state });
+  res.json({ success: true, message: `Assigned ${assignedIds.length} random images to ${auditorId}.`, state: sanitizeStateForClient(state) });
 });
 
 app.post("/api/images/unassign", async (req, res) => {
@@ -396,7 +418,7 @@ app.post("/api/images/unassign", async (req, res) => {
   }
 
   await saveState(state);
-  res.json({ success: true, message: `Restored full catalog queue for ${auditorId}.`, state });
+  res.json({ success: true, message: `Restored full catalog queue for ${auditorId}.`, state: sanitizeStateForClient(state) });
 });
 
 
