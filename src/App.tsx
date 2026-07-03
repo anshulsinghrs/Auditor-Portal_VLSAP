@@ -511,6 +511,36 @@ export default function App() {
     return { completed: completedImageIds.size, total: activeImages.length };
   }, [audits, auditorProfile, activeImages, calibrationPhase]);
 
+  // Set of panoramas the current auditor has fully completed (every applicable variable
+  // answered, respecting the footway dependency cascade). Used to mark nav dots green.
+  const completedImageIds = React.useMemo(() => {
+    const done = new Set<string>();
+    if (!auditorProfile) return done;
+    const mode = calibrationPhase === "Reconciliation" ? "Validation" : calibrationPhase;
+
+    // Build a per-image map of variableId -> value for this auditor and mode
+    const byImage: Record<string, Record<string, string>> = {};
+    audits.forEach((a) => {
+      if (a.auditorId === auditorProfile && a.mode === mode && a.protocol === "A") {
+        if (!byImage[a.imageId]) byImage[a.imageId] = {};
+        byImage[a.imageId][a.variableId] = a.value;
+      }
+    });
+
+    activeImages.forEach((img) => {
+      const ansMap = byImage[img.id] || {};
+      const allAnswered = variables.every((v) => {
+        // A dependent variable that is currently disabled counts as satisfied
+        const disabled = v.requires ? ansMap[v.requires.variableId] !== v.requires.value : false;
+        if (disabled) return true;
+        const val = ansMap[v.id];
+        return val !== undefined && val !== "";
+      });
+      if (allAnswered) done.add(img.id);
+    });
+    return done;
+  }, [audits, activeImages, auditorProfile, calibrationPhase, variables]);
+
   // Retrieve active designation from cache at top level (prevents React hook order violation)
   const activeDesignation = React.useMemo(() => {
     if (!auditorProfile) return "";
@@ -766,19 +796,24 @@ export default function App() {
                   </button>
 
                   <div className="flex space-x-0.5 max-w-[240px] overflow-x-auto py-0.5 px-1 bg-slate-50 rounded border border-slate-200/60">
-                    {activeImages.map((img, idx) => (
-                      <button
-                        key={img.id}
-                        onClick={() => navigateImage(idx)}
-                        className={`h-4 w-4 rounded-sm text-[9px] font-mono flex items-center justify-center font-bold shrink-0 transition-all cursor-pointer ${
-                          idx === currentImageIndex 
-                            ? "bg-slate-900 text-white" 
-                            : "bg-slate-200/70 text-slate-600 hover:bg-slate-300/80"
-                        }`}
-                      >
-                        {idx + 1}
-                      </button>
-                    ))}
+                    {activeImages.map((img, idx) => {
+                      const isDone = completedImageIds.has(img.id);
+                      const isActive = idx === currentImageIndex;
+                      return (
+                        <button
+                          key={img.id}
+                          title={isDone ? "Completed" : "Not yet completed"}
+                          onClick={() => navigateImage(idx)}
+                          className={`h-4 w-4 rounded-sm text-[9px] font-mono flex items-center justify-center font-bold shrink-0 transition-all cursor-pointer ${
+                            isDone
+                              ? "bg-emerald-500 text-white hover:bg-emerald-600"
+                              : "bg-slate-200/70 text-slate-600 hover:bg-slate-300/80"
+                          } ${isActive ? "ring-2 ring-inset ring-slate-900" : ""}`}
+                        >
+                          {idx + 1}
+                        </button>
+                      );
+                    })}
                   </div>
 
                   <button
