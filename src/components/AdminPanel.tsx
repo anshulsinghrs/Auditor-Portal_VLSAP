@@ -212,9 +212,50 @@ export default function AdminPanel({
     onSaveSettings({ currentProject: projectNameInput.trim() });
   };
 
+  // Coverage stats. "Images audited" = distinct panoramas that have at least one
+  // human (non-AI) evaluation. A per-rater breakdown is also computed for the team card.
+  const auditedByRater: Record<string, Set<string>> = {};
+  audits.forEach((a) => {
+    if (!auditedByRater[a.auditorId]) auditedByRater[a.auditorId] = new Set();
+    auditedByRater[a.auditorId].add(a.imageId);
+  });
+  const auditedImageCount = new Set(
+    audits.filter((a) => a.auditorId !== "Gemini-3.5-Flash").map((a) => a.imageId)
+  ).size;
+
   return (
     <div className="space-y-3 text-slate-800 font-sans animate-fade-in" id="vlsap-admin-panel">
-      
+
+      {/* Study coverage summary */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div className="bg-white border border-slate-200/85 rounded p-3 shadow-none">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[9px] font-mono font-bold uppercase text-slate-400">Catalog Images</span>
+            <Database className="h-4 w-4 text-slate-400" />
+          </div>
+          <div className="text-xl font-extrabold text-slate-900 font-mono">{images.length}</div>
+          <div className="text-[9px] text-slate-400 font-mono">Panoramas in active queue</div>
+        </div>
+
+        <div className="bg-white border border-slate-200/85 rounded p-3 shadow-none border-l-2 border-l-emerald-500">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[9px] font-mono font-bold uppercase text-slate-400">Images Audited</span>
+            <CheckCircle className="h-4 w-4 text-emerald-500" />
+          </div>
+          <div className="text-xl font-extrabold text-emerald-700 font-mono">{auditedImageCount}</div>
+          <div className="text-[9px] text-slate-400 font-mono">Distinct images with a human evaluation</div>
+        </div>
+
+        <div className="bg-white border border-slate-200/85 rounded p-3 shadow-none col-span-2 md:col-span-1">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[9px] font-mono font-bold uppercase text-slate-400">Total Evaluations</span>
+            <Sparkles className="h-4 w-4 text-indigo-500" />
+          </div>
+          <div className="text-xl font-extrabold text-slate-900 font-mono">{audits.length}</div>
+          <div className="text-[9px] text-slate-400 font-mono">Records across all raters &amp; AI</div>
+        </div>
+      </div>
+
       {/* 2-Column Core settings layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         
@@ -363,6 +404,12 @@ export default function AdminPanel({
 
                     {/* Queue Assignment Sub-section */}
                     <div className="border-t border-slate-200/50 pt-1.5 mt-1.5 flex flex-col gap-1">
+                      <div className="flex items-center justify-between text-[8px] font-sans">
+                        <span className="text-slate-500 font-semibold">Images Audited:</span>
+                        <span className="bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold px-1 rounded-sm">
+                          {auditedByRater[rater]?.size || 0}
+                        </span>
+                      </div>
                       <div className="flex items-center justify-between text-[8px] font-sans">
                         <span className="text-slate-500 font-semibold">Queue Scope:</span>
                         {auditorImages[rater] && auditorImages[rater].length > 0 ? (
