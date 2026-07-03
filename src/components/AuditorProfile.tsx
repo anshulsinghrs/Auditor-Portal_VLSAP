@@ -20,6 +20,19 @@ export default function AuditorProfile({ raters, onSelectProfile, onCreateProfil
   const [age, setAge] = useState("");
   const [education, setEducation] = useState("");
 
+  // Only surface profiles that were registered on THIS device (i.e. the auditor's own),
+  // never the full roster of every rater. New auditors just register below.
+  const ownProfiles = React.useMemo(() => {
+    let details: Record<string, unknown> = {};
+    try {
+      details = JSON.parse(localStorage.getItem("vlsap_auditor_profiles_details") || "{}");
+    } catch (e) {
+      details = {};
+    }
+    const ownIds = new Set(Object.keys(details));
+    return raters.filter((r) => ownIds.has(r));
+  }, [raters]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !gender || !designation.trim() || !age || !education) {
@@ -52,14 +65,14 @@ export default function AuditorProfile({ raters, onSelectProfile, onCreateProfil
           </p>
         </div>
 
-        {/* Existing Profiles block */}
-        {raters.length > 0 && (
+        {/* Existing Profiles block — only the auditor's own profiles registered on this device */}
+        {ownProfiles.length > 0 && (
           <div className="bg-white border border-slate-200 rounded-lg p-5 space-y-3 shadow-sm">
             <label className="text-[10px] font-bold text-slate-700 uppercase tracking-wider font-mono flex items-center gap-1.5">
-              <Shield className="h-3.5 w-3.5 text-slate-400" /> Select Existing Auditor Profile
+              <Shield className="h-3.5 w-3.5 text-slate-400" /> Resume Your Auditor Profile
             </label>
             <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-0.5">
-              {raters.map((rater) => (
+              {ownProfiles.map((rater) => (
                 <button
                   key={rater}
                   type="button"
