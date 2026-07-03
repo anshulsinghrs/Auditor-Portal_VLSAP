@@ -101,7 +101,7 @@ export function calculateKrippendorffAlpha(
   // Compute Alpha for the full dataset
   const { alpha, obsDis, expDis, sampleSize } = computeAlphaCore(grid, categories, metric);
 
-  // Run Bootstrapping to get 95% Confidence Intervals (500 resamples)
+  // Run Bootstrapping to get 95% Confidence Intervals (B resamples, see below)
   const bootstrapAlphas: number[] = [];
   const B = 200; // 200 is fast, stable, and highly accurate for the preview engine without lag
 

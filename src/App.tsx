@@ -32,6 +32,7 @@ export default function App() {
   const [currentProject, setCurrentProject] = useState("VLSAP Calibration Micro-Pilot");
   const [calibrationPhase, setCalibrationPhase] = useState<"Cold Read" | "Warm Read" | "Reconciliation">("Cold Read");
   const [googleApiKey, setGoogleApiKey] = useState("");
+  const [hasGoogleApiKey, setHasGoogleApiKey] = useState(false);
   const [googleDriveFolderId, setGoogleDriveFolderId] = useState("1ENECfT_ETGATB4533yAEKRZ-HugbMbad");
   const [instrumentLocked, setInstrumentLocked] = useState(false);
   const [auditorImages, setAuditorImages] = useState<Record<string, string[]>>({});
@@ -71,6 +72,7 @@ export default function App() {
         setCurrentProject(state.currentProject || "VLSAP Calibration Micro-Pilot");
         setCalibrationPhase(state.calibrationPhase || "Cold Read");
         setGoogleApiKey(state.googleApiKey || "");
+        setHasGoogleApiKey((state as any).hasGoogleApiKey ?? false);
         setGoogleDriveFolderId(state.googleDriveFolderId || "1ENECfT_ETGATB4533yAEKRZ-HugbMbad");
         setInstrumentLocked(state.instrumentLocked || false);
         setAuditorImages(state.auditorImages || {});
@@ -183,10 +185,13 @@ export default function App() {
 
   // Immediate autosave mechanism to server db
   const handleSaveAnswer = async (
-    variableId: string, 
+    variableId: string,
     data: { value: string; confidence: number; comment: string }
   ) => {
-    const activeImage = images[currentImageIndex];
+    // Must mirror the list the auditor is actually viewing (activeImages), which is the
+    // rater's assigned subset. Using the full `images` list here saved answers against the
+    // wrong image and made the selection appear to do nothing.
+    const activeImage = activeImages[currentImageIndex];
     const activeRater = auditorProfile || "Rater A";
     if (!activeImage) return;
 
@@ -258,6 +263,7 @@ export default function App() {
         setCurrentProject(data.state.currentProject || "VLSAP Calibration Micro-Pilot");
         setCalibrationPhase(data.state.calibrationPhase || "Cold Read");
         setGoogleApiKey(data.state.googleApiKey || "");
+        setHasGoogleApiKey(data.state.hasGoogleApiKey ?? false);
         setGoogleDriveFolderId(data.state.googleDriveFolderId || "1ENECfT_ETGATB4533yAEKRZ-HugbMbad");
         setInstrumentLocked(data.state.instrumentLocked || false);
         setAuditorImages(data.state.auditorImages || {});
@@ -292,6 +298,7 @@ export default function App() {
     if (data.success) {
       setImages(data.images);
       setGoogleApiKey(apiKey);
+      if (apiKey) setHasGoogleApiKey(true);
       setGoogleDriveFolderId(folderId);
     }
     return { success: data.success, message: data.message };
@@ -928,6 +935,7 @@ export default function App() {
           audits={audits}
           raters={raters}
           googleApiKey={googleApiKey}
+          hasGoogleApiKey={hasGoogleApiKey}
           googleDriveFolderId={googleDriveFolderId}
           instrumentLocked={instrumentLocked}
           calibrationPhase={calibrationPhase}
