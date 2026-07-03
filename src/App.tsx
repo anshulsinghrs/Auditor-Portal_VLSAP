@@ -163,6 +163,42 @@ export default function App() {
 
   // Navigation that changes active image index
   const navigateImage = (newIndexOrFn: number | ((prev: number) => number)) => {
+    // Check if there is an active auditor session and an active image
+    const currentImage = activeImages[currentImageIndex];
+    if (auditorProfile && currentImage) {
+      const activeRater = auditorProfile;
+      const mode = calibrationPhase === "Reconciliation" ? "Validation" : calibrationPhase;
+      
+      // Get all current answers for this image
+      const currentImageAnswers = audits.filter(
+        (a) =>
+          a.imageId === currentImage.id &&
+          a.auditorId === activeRater &&
+          a.mode === mode &&
+          a.protocol === "A"
+      );
+
+      // Find active variables that don't have a value
+      const unanswered = variables.filter((v) => {
+        // Evaluate requirements to see if this variable is enabled
+        if (v.requires) {
+          const depAns = currentImageAnswers.find(a => a.variableId === v.requires?.variableId)?.value;
+          if (depAns !== v.requires.value) {
+            return false; // Disabled by dependency rule
+          }
+        }
+        
+        // Check if an answer choice has been selected
+        const answerVal = currentImageAnswers.find(a => a.variableId === v.id)?.value;
+        return !answerVal || answerVal === "";
+      });
+
+      if (unanswered.length > 0) {
+        alert(`Please answer all active questions before leaving this panorama.\n\nMissing: ${unanswered.map(v => v.name).join(", ")}`);
+        return; // Block navigation
+      }
+    }
+
     setCurrentImageIndex((prev) => {
       const nextIdx = typeof newIndexOrFn === "function" ? newIndexOrFn(prev) : newIndexOrFn;
       return Math.max(0, Math.min(activeImages.length - 1, nextIdx));
