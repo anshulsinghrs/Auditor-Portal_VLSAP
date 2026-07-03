@@ -65,20 +65,31 @@ export default function AuditForm({
   const handleValueChange = (variableId: string, value: string) => {
     const existing = answers[variableId] || { value: "", confidence: 4, comment: "" };
     
+    // Toggle: if clicked option is already selected, deselect it (set to "")
+    const newValue = existing.value === value ? "" : value;
+    
     // Custom dependency cascades
-    // E.g., if we mark "footway_present" as "Absent", we clear/disable sub-metrics
-    if (variableId === "footway_present" && value === "Absent") {
-      // Trigger save of children variables as "N/A"
-      variables.forEach((variable) => {
-        if (variable.requires?.variableId === "footway_present") {
-          let defaultValue = "N/A";
-          if (variable.id === "footway_continuity") defaultValue = "No Footway";
-          onSaveAnswer(variable.id, { value: defaultValue, confidence: 5, comment: "Automatically set due to absence of footway structure." });
-        }
-      });
+    if (variableId === "footway_present") {
+      if (newValue === "Absent") {
+        // Trigger save of children variables as "N/A"
+        variables.forEach((variable) => {
+          if (variable.requires?.variableId === "footway_present") {
+            let defaultValue = "N/A";
+            if (variable.id === "footway_continuity") defaultValue = "No Footway";
+            onSaveAnswer(variable.id, { value: defaultValue, confidence: 5, comment: "Automatically set due to absence of footway structure." });
+          }
+        });
+      } else if (newValue === "Present" || newValue === "") {
+        // Clear children variables so user can select/change their options cleanly
+        variables.forEach((variable) => {
+          if (variable.requires?.variableId === "footway_present") {
+            onSaveAnswer(variable.id, { value: "", confidence: 4, comment: "" });
+          }
+        });
+      }
     }
 
-    onSaveAnswer(variableId, { ...existing, value });
+    onSaveAnswer(variableId, { ...existing, value: newValue });
   };
 
   const handleConfidenceChange = (variableId: string, confidence: number) => {
