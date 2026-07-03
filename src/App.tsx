@@ -190,15 +190,20 @@ export default function App() {
 
     if (missingVariables.length === 0) return;
 
-    // For each missing variable, construct and send a save request
-    const promises = missingVariables.map(async (v) => {
+    const newRecordsToSave: any[] = [];
+    const timestamp = new Date().toISOString();
+
+    missingVariables.forEach((v) => {
       let defaultValue = v.options[0];
       if (v.options.includes("Unknown")) defaultValue = "Unknown";
       else if (v.options.includes("None")) defaultValue = "None";
       else if (v.options.includes("Absent")) defaultValue = "Absent";
       else if (v.options.includes("N/A")) defaultValue = "N/A";
 
+      const recordId = `rec-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
       const newRecord = {
+        id: recordId,
         imageId: imageId,
         driveId: activeImages.find(img => img.id === imageId)?.driveId || `local-${imageId}`,
         auditorId: activeRater,
@@ -209,58 +214,52 @@ export default function App() {
         confidence: 3, // neutral confidence
         comment: "Auto-submitted (unanswered variable on progress transition)",
         mode: mode,
-        protocol: "A"
+        protocol: "A",
+        timestamp: timestamp
       };
-
-      // Save locally in state
-      setAudits((prev) => {
-        const idx = prev.findIndex(
-          (a) =>
-            a.imageId === newRecord.imageId &&
-            a.auditorId === newRecord.auditorId &&
-            a.variableId === newRecord.variableId &&
-            a.mode === newRecord.mode &&
-            a.protocol === newRecord.protocol
-        );
-        const updated = {
-          ...newRecord,
-          id: prev[idx]?.id || `rec-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          timestamp: new Date().toISOString()
-        } as AuditRecord;
-        
-        if (idx >= 0) {
-          const next = [...prev];
-          next[idx] = updated;
-          return next;
-        } else {
-          return [...prev, updated];
-        }
-      });
-
-      // Save to server
-      try {
-        await fetch("/api/audits/save", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...newRecord,
-            id: `rec-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            timestamp: new Date().toISOString()
-          })
-        });
-      } catch (e) {
-        console.error("Auto-submit failed for", v.id, e);
-      }
+      
+      newRecordsToSave.push(newRecord);
     });
 
-    await Promise.all(promises);
+    // Save locally in React UI state first (instant response)
+    setAudits((prev) => {
+      const next = [...prev];
+      newRecordsToSave.forEach((newRec) => {
+        const idx = next.findIndex(
+          (a) =>
+            a.imageId === newRec.imageId &&
+            a.auditorId === newRec.auditorId &&
+            a.variableId === newRec.variableId &&
+            a.mode === newRec.mode &&
+            a.protocol === newRec.protocol
+        );
+        if (idx >= 0) {
+          next[idx] = newRec;
+        } else {
+          next.push(newRec);
+        }
+      });
+      return next;
+    });
+
+    // Save batch to server in a single request
+    try {
+      await fetch("/api/audits/save-batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ records: newRecordsToSave })
+      });
+    } catch (e) {
+      console.error("Auto-submit batch failed:", e);
+    }
   };
 
   // Safe navigation that auto-submits current image answers first
   const navigateImage = async (newIndexOrFn: number | ((prev: number) => number)) => {
     const currentImage = activeImages[currentImageIndex];
     if (currentImage) {
-      await ensureAllVariablesSubmitted(currentImage.id);
+      // Run the auto-submit asynchronously so that slide transitions are instant and lag-free!
+      ensureAllVariablesSubmitted(currentImage.id);
     }
     setCurrentImageIndex((prev) => {
       const nextIdx = typeof newIndexOrFn === "function" ? newIndexOrFn(prev) : newIndexOrFn;

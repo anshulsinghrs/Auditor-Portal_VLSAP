@@ -221,6 +221,45 @@ app.post("/api/audits/save", async (req, res) => {
   res.json({ success: true, record: updatedRecord });
 });
 
+app.post("/api/audits/save-batch", async (req, res) => {
+  const state = await loadState();
+  const records = req.body.records;
+  
+  if (!Array.isArray(records)) {
+    return res.status(400).json({ error: "Missing required records array." });
+  }
+
+  for (const newRecord of records) {
+    if (!newRecord.imageId || !newRecord.auditorId || !newRecord.variableId) {
+      continue;
+    }
+
+    const index = state.audits.findIndex(
+      (a: any) =>
+        a.imageId === newRecord.imageId &&
+        a.auditorId === newRecord.auditorId &&
+        a.variableId === newRecord.variableId &&
+        a.mode === newRecord.mode &&
+        a.protocol === newRecord.protocol
+    );
+
+    const updatedRecord = {
+      ...newRecord,
+      id: newRecord.id || `rec-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      timestamp: new Date().toISOString()
+    };
+
+    if (index >= 0) {
+      state.audits[index] = updatedRecord;
+    } else {
+      state.audits.push(updatedRecord);
+    }
+  }
+
+  await saveState(state);
+  res.json({ success: true });
+});
+
 app.post("/api/audits/clear", async (req, res) => {
   const state = await loadState();
   state.audits = [];
