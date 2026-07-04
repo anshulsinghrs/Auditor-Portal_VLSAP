@@ -214,7 +214,7 @@ export default function App() {
   // Protect AI Audit and Admin Dashboard with a password gate
   const handleSecureNavigation = (view: "ai" | "admin") => {
     const password = window.prompt(`Please enter the security password to access the ${view === "admin" ? "Admin Dashboard" : "AI Audit Interface"}:`);
-    if (password === "TechnoWER@123") {
+    if (password === "anshulWER") {
       setActiveView(view);
     } else if (password !== null) {
       alert("Incorrect password! Access denied.");
