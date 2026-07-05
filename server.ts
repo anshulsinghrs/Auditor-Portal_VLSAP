@@ -616,19 +616,17 @@ app.post("/api/gemini/audit", async (req, res) => {
 
     // 3. Request Gemini to audit based on our variables and output structured JSON
     const systemPrompt = `You are an expert academic rater evaluating Google Street View images for the Vision-Language Street Audit Platform (VLSAP).
-You must analyze the provided street scene and audit the following 12 variables precisely:
+You must analyze the provided street scene and audit the following 10 variables precisely:
 1. footway_present ("Present" or "Absent")
 2. usable_clear_path ("Unobstructed", "Partially Obstructed", "Blocked" - only if footway is Present)
 3. effective_width ("< 1.0m", "1.0m - 1.5m", "1.5m - 2.0m", "> 2.0m" - only if footway is Present)
 4. footway_continuity ("Continuous", "Intermittent/Broken", "No Footway" - only if footway is Present)
 5. surface_condition ("Good", "Fair", "Poor" - only if footway is Present)
-6. crossing_present ("Present" or "Absent")
-7. encroachment_severity ("None (Level 1)", "Minor (Level 2)", "Moderate (Level 3)", "Severe (Level 4)", "Total Obstruction (Level 5)" - only if footway is Present)
-8. parking_on_footway ("None", "1-2 Vehicles", "3+ Vehicles" - only if footway is Present)
-9. vending_intensity ("None", "Light", "Heavy" - only if footway is Present)
-10. pedestrian_displacement ("No", "Yes (Observed)", "Yes (Forced due to obstacles)")
-11. traffic_threat ("Low", "Medium", "High")
-12. overall_walkability (A holistic score "1 (Very Poor)", "2", "3", "4", "5", "6", "7 (Excellent)")
+6. encroachment_severity ("None (Level 1)", "Minor (Level 2)", "Moderate (Level 3)", "Severe (Level 4)", "Total Obstruction (Level 5)" - only if footway is Present)
+7. parking_on_footway ("None", "1-2 Vehicles", "3+ Vehicles" - only if footway is Present)
+8. vending_intensity ("None", "Light", "Heavy" - only if footway is Present)
+9. traffic_threat ("Low", "Medium", "High")
+10. overall_walkability (A holistic score "1 (Very Poor)", "2", "3", "4", "5", "6", "7 (Excellent)")
 
 Make sure you adhere to physical evidence and the logical dependencies (e.g., if footway_present is Absent, then all footway metrics must be marked "N/A" or left blank, except continuity which is "No Footway"). Provide a confidence rating (1 to 5) and a descriptive comment for your visual observations.`;
 
@@ -792,12 +790,6 @@ function simulateGeminiAudit(imageId: string) {
       comment: isMarket ? "High-definition view reveals crack patterns, concrete scaling, and dirt piling." : "Excellent smooth paving tiles with tactile guidance."
     },
     {
-      variableId: "crossing_present",
-      value: isJunction ? "Present" : "Absent",
-      confidence: 5,
-      comment: isJunction ? "High-visibility Shibuya zebra crossings are fully marked and in use." : "No painted pedestrian lanes visible on the carriageway."
-    },
-    {
       variableId: "encroachment_severity",
       value: isMarket ? "Severe (Level 4)" : "None (Level 1)",
       confidence: 5,
@@ -814,12 +806,6 @@ function simulateGeminiAudit(imageId: string) {
       value: isMarket ? "Heavy" : "None",
       confidence: 5,
       comment: isMarket ? "Multiple commercial and food stalls visible on the sidewalk." : "No street-vending booths identified."
-    },
-    {
-      variableId: "pedestrian_displacement",
-      value: isMarket ? "Yes (Forced due to obstacles)" : "No",
-      confidence: 4,
-      comment: isMarket ? "Observed pedestrians walking on the edge of the asphalt due to obstructed path." : "Pedestrians are safely utilizing the sidewalk corridor."
     },
     {
       variableId: "traffic_threat",
@@ -840,7 +826,7 @@ function simulateGeminiAudit(imageId: string) {
 function getInitialMockAudits() {
   const records: any[] = [];
   const raters = ["Rater A", "Rater B", "Rater C", "Rater D", "Rater E"];
-  const variables = ["footway_present", "usable_clear_path", "effective_width", "footway_continuity", "surface_condition", "crossing_present", "encroachment_severity", "parking_on_footway", "vending_intensity", "pedestrian_displacement", "traffic_threat", "overall_walkability"];
+  const variables = ["footway_present", "usable_clear_path", "effective_width", "footway_continuity", "surface_condition", "encroachment_severity", "parking_on_footway", "vending_intensity", "traffic_threat", "overall_walkability"];
 
   // Populate first 5 images for all raters in "Cold Read" and "Warm Read" to make agreement statistics fully populated!
   for (let imgIdx = 0; imgIdx < 5; imgIdx++) {
@@ -867,16 +853,12 @@ function getInitialMockAudits() {
           val = "Continuous";
         } else if (vId === "surface_condition") {
           val = isI1 ? (rIdx % 2 === 0 ? "Poor" : "Fair") : "Good";
-        } else if (vId === "crossing_present") {
-          val = imgId === "VLSAP-I2" ? "Present" : "Absent";
         } else if (vId === "encroachment_severity") {
           val = isI1 ? (rIdx === 0 ? "Severe (Level 4)" : rIdx === 1 ? "Moderate (Level 3)" : "Severe (Level 4)") : "None (Level 1)";
         } else if (vId === "parking_on_footway") {
           val = isI1 ? (rIdx % 2 === 0 ? "3+ Vehicles" : "1-2 Vehicles") : "None";
         } else if (vId === "vending_intensity") {
           val = isI1 ? "Heavy" : "None";
-        } else if (vId === "pedestrian_displacement") {
-          val = isI1 ? "Yes (Forced due to obstacles)" : "No";
         } else if (vId === "traffic_threat") {
           val = isI4 ? "High" : "Low";
         } else if (vId === "overall_walkability") {
@@ -915,16 +897,12 @@ function getInitialMockAudits() {
           val = "Continuous";
         } else if (vId === "surface_condition") {
           val = isI1 ? "Poor" : "Good";
-        } else if (vId === "crossing_present") {
-          val = imgId === "VLSAP-I2" ? "Present" : "Absent";
         } else if (vId === "encroachment_severity") {
           val = isI1 ? "Severe (Level 4)" : "None (Level 1)"; // Fully converged!
         } else if (vId === "parking_on_footway") {
           val = isI1 ? "3+ Vehicles" : "None";
         } else if (vId === "vending_intensity") {
           val = isI1 ? "Heavy" : "None";
-        } else if (vId === "pedestrian_displacement") {
-          val = isI1 ? "Yes (Forced due to obstacles)" : "No";
         } else if (vId === "traffic_threat") {
           val = isI4 ? "High" : "Low";
         } else if (vId === "overall_walkability") {

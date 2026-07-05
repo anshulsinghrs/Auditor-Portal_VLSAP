@@ -103,23 +103,6 @@
     }
   },
   {
-    "id": "crossing_present",
-    "name": "Crossing Presence",
-    "domain": "Crossing Infrastructure",
-    "definition": "Evaluate if there is a marked pedestrian crossing (zebra lines, parallel lines, or highlighted pavement) visible within the segment views.",
-    "evidence": "Paint markings on road surface, pedestrian crossing signs, or electronic pedestrian signals at junctions.",
-    "positiveExamples": [
-      "Clearly painted white zebra stripes across the asphalt.",
-      "Tactile paved crossing ramp with pedestrian lights."
-    ],
-    "negativeExamples": [
-      "An informal crossing point where pedestrians cross the busy road without markings.",
-      "A regular intersection with no pedestrian signage or street paint."
-    ],
-    "unknownRule": "Rate Unknown if the intersection area is completely out of view or severely shadowed.",
-    "options": ["Present", "Absent"]
-  },
-  {
     "id": "encroachment_severity",
     "name": "Encroachment Severity",
     "domain": "Pedestrian Space Occupation",
@@ -183,23 +166,6 @@
       "value": "Present",
       "disableMessage": "Only applicable when a footway is present."
     }
-  },
-  {
-    "id": "pedestrian_displacement",
-    "name": "Pedestrian Displacement",
-    "domain": "Pedestrian Space Occupation",
-    "definition": "Observe whether pedestrians are forced to walk in the vehicular carriageway because the footway is absent, blocked, or heavily encroached upon.",
-    "evidence": "People walking alongside vehicular traffic on the asphalt, specifically where they have to step around parked cars or vendor stalls.",
-    "positiveExamples": [
-      "All pedestrians walking safely on an unobstructed sidewalk.",
-      "No pedestrians walking in the road."
-    ],
-    "negativeExamples": [
-      "A parent pushing a stroller in the traffic lane because a parked vehicle blocks the sidewalk ramp (Forced).",
-      "Pedestrians walking in the traffic lane because there is no sidewalk provided (Forced)."
-    ],
-    "unknownRule": "Mark Unknown if no pedestrians are currently present in the scene and the physical obstructions do not make displacement mathematically certain.",
-    "options": ["No", "Yes (Observed)", "Yes (Forced due to obstacles)"]
   },
   {
     "id": "traffic_threat",
