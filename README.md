@@ -1,5 +1,7 @@
 # 🚀 Vision-Language Street Audit Platform (VLSAP)
 
+**Made with ❤️ by Anshul Singh (IITKGP)**
+
 [![React](https://img.shields.io/badge/React-19.0-blue?logo=react&logoColor=white)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-6.2-purple?logo=vite&logoColor=white)](https://vite.dev/)
