@@ -720,8 +720,9 @@ export default function App() {
             </div>
 
             {/* Footer */}
-            <div className="text-center text-[10px] text-slate-400 font-mono">
-              VLSAP Academic Calibration • Managed Container Environment
+            <div className="text-center text-[10px] text-slate-400 font-mono space-y-1">
+              <div>VLSAP Academic Calibration • Managed Container Environment</div>
+              <div className="text-indigo-600 font-semibold mt-1">Made by Anshul Singh IITKGP</div>
             </div>
           </div>
         </div>
