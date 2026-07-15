@@ -83,7 +83,7 @@ async function loadState() {
           instrumentLocked: false,
           auditorImages: {},
           autoAssignEnabled: true,
-          autoAssignCount: 25
+          autoAssignCount: 20
         };
         await dbCollection.insertOne({ _id: "app_state", ...initialState });
         return initialState;
@@ -114,7 +114,7 @@ async function loadState() {
       instrumentLocked: false,
       auditorImages: {},
       autoAssignEnabled: true,
-      autoAssignCount: 25
+      autoAssignCount: 20
     };
     fs.writeFileSync(DB_FILE, JSON.stringify(initialState, null, 2));
     return initialState;
@@ -139,7 +139,7 @@ async function loadState() {
       instrumentLocked: false,
       auditorImages: {},
       autoAssignEnabled: true,
-      autoAssignCount: 25
+      autoAssignCount: 20
     };
     fs.writeFileSync(DB_FILE, JSON.stringify(fallback, null, 2));
     return fallback;

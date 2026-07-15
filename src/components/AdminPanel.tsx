@@ -429,39 +429,7 @@ export default function AdminPanel({
                         )}
                       </div>
 
-                      <div className="flex items-center gap-1 mt-0.5">
-                        <input
-                          type="number"
-                          min="1"
-                          max="1000"
-                          placeholder="25"
-                          value={assignCountMap[rater] ?? 25}
-                          onChange={(e) => {
-                            const val = Math.max(1, Number(e.target.value) || 25);
-                            setAssignCountMap(prev => ({ ...prev, [rater]: val }));
-                          }}
-                          className="w-10 bg-white border border-slate-200 rounded px-1 py-0.5 text-center font-bold text-[9px] outline-none"
-                        />
-                        <button
-                          onClick={async () => {
-                            const cnt = assignCountMap[rater] ?? 25;
-                            await onAssignImages(rater, cnt);
-                          }}
-                          className="px-1.5 py-0.5 bg-slate-900 text-white font-bold text-[9px] rounded hover:bg-slate-800 cursor-pointer"
-                        >
-                          Assign
-                        </button>
-                        {auditorImages[rater] && auditorImages[rater].length > 0 && (
-                          <button
-                            onClick={async () => {
-                              await onUnassignImages(rater);
-                            }}
-                            className="px-1.5 py-0.5 bg-white border border-slate-200 text-red-600 hover:text-red-700 font-bold text-[9px] rounded cursor-pointer"
-                          >
-                            Clear
-                          </button>
-                        )}
-                      </div>
+
                     </div>
                   </div>
                 );
@@ -638,34 +606,22 @@ export default function AdminPanel({
 
             {/* Automatic Assignment Trigger Section */}
             <div className="pt-2.5 border-t border-slate-200 mt-2.5 space-y-2 text-xs">
-              <span className="text-[10px] font-bold text-slate-800 uppercase font-mono tracking-wider block">Automatic Assignment Settings</span>
+              <span className="text-[10px] font-bold text-slate-800 uppercase font-mono tracking-wider block">Rater Task Settings</span>
               
-              <label className="flex items-center space-x-2 text-[11px] text-slate-600 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={autoAssignEnabled}
-                  onChange={(e) => onSaveSettings({ autoAssignEnabled: e.target.checked })}
-                  className="rounded border-slate-350 text-slate-900 focus:ring-0"
-                />
-                <span className="font-semibold text-slate-700">Auto-assign tasks to new/unassigned raters</span>
-              </label>
-
-              {autoAssignEnabled && (
-                <div className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-200">
-                  <span className="text-[10px] text-slate-500 font-mono">Assigned subset size:</span>
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="number"
-                      min="1"
-                      max="1000"
-                      value={autoAssignCount}
-                      onChange={(e) => onSaveSettings({ autoAssignCount: Math.max(1, Number(e.target.value) || 25) })}
-                      className="w-14 bg-white border border-slate-200 rounded px-1 py-0.5 text-center font-bold text-[10px] outline-none"
-                    />
-                    <span className="text-[10px] text-slate-400 font-mono">images</span>
-                  </div>
+              <div className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-200">
+                <span className="text-[10px] text-slate-500 font-mono">Questions per rater (default 20):</span>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    min="1"
+                    max="1000"
+                    value={autoAssignCount}
+                    onChange={(e) => onSaveSettings({ autoAssignCount: Math.max(1, Number(e.target.value) || 20) })}
+                    className="w-14 bg-white border border-slate-200 rounded px-1 py-0.5 text-center font-bold text-[10px] outline-none"
+                  />
+                  <span className="text-[10px] text-slate-400 font-mono">questions</span>
                 </div>
-              )}
+              </div>
             </div>
           </div>
         </div>

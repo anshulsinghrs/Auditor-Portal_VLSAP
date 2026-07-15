@@ -14647,7 +14647,8 @@
     "Rater - Anshul",
     "Rater - a",
     "Rater - anshul",
-    "Rater - cooc"
+    "Rater - cooc",
+    "Rater - qq"
   ],
   "auditorProfiles": {
     "Rater - Anshul": {
@@ -14677,6 +14678,13 @@
       "designation": "student",
       "age": 23,
       "education": "Bachelor's Degree"
+    },
+    "Rater - qq": {
+      "name": "qq",
+      "gender": "Male",
+      "designation": "Student",
+      "age": 25,
+      "education": "Master's Degree"
     }
   },
   "projects": [
@@ -14827,6 +14835,28 @@
       "Kolkata-278.0",
       "Kolkata-1975.0",
       "Kolkata-73638.0"
+    ],
+    "Rater - qq": [
+      "Kolkata-1524.0",
+      "Kolkata-51223.0",
+      "Kolkata-40955.0",
+      "Kolkata-50828.0",
+      "Kolkata-71093.0",
+      "Kolkata-53719.0",
+      "Kolkata-77471.0",
+      "Kolkata-69072.0",
+      "Kolkata-69178.0",
+      "Kolkata-24865.0",
+      "Kolkata-31179.0",
+      "Kolkata-79470.0",
+      "Kolkata-51149.0",
+      "Kolkata-3.0",
+      "Kolkata-61907.0",
+      "Kolkata-69741.0",
+      "Kolkata-71198.0",
+      "Kolkata-76985.0",
+      "Kolkata-34605.0",
+      "Kolkata-40945.0"
     ]
   }
 }

@@ -38,7 +38,7 @@ export default function App() {
   const [auditorImages, setAuditorImages] = useState<Record<string, string[]>>({});
   const [auditorProfiles, setAuditorProfiles] = useState<Record<string, any>>({});
   const [autoAssignEnabled, setAutoAssignEnabled] = useState(true);
-  const [autoAssignCount, setAutoAssignCount] = useState(25);
+  const [autoAssignCount, setAutoAssignCount] = useState(20);
 
   // Active Session State
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -79,7 +79,7 @@ export default function App() {
         setAuditorImages(state.auditorImages || {});
         setAuditorProfiles(state.auditorProfiles || {});
         setAutoAssignEnabled(state.autoAssignEnabled ?? true);
-        setAutoAssignCount(state.autoAssignCount ?? 25);
+        setAutoAssignCount(state.autoAssignCount ?? 20);
       }
     } catch (e) {
       console.error("Failed to connect to full-stack server state API:", e);
@@ -307,7 +307,7 @@ export default function App() {
         setAuditorImages(data.state.auditorImages || {});
         setAuditorProfiles(data.state.auditorProfiles || {});
         setAutoAssignEnabled(data.state.autoAssignEnabled ?? true);
-        setAutoAssignCount(data.state.autoAssignCount ?? 25);
+        setAutoAssignCount(data.state.autoAssignCount ?? 20);
       }
     } catch (e) {
       console.error("Failed to update server settings:", e);
