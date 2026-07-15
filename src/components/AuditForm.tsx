@@ -1,10 +1,11 @@
 import React, { useState } from "react";
-import { Info, HelpCircle, ChevronDown, ChevronUp, Save, Star, AlertCircle } from "lucide-react";
-import { VLSAPVariable, AuditRecord } from "../types";
+import { Info, HelpCircle, ChevronDown, ChevronUp, Save, AlertCircle } from "lucide-react";
+import { VLSAPVariable, AuditRecord, StreetViewImage } from "../types";
 
 interface AuditFormProps {
   variables: VLSAPVariable[];
   currentImageId: string;
+  currentImage: StreetViewImage;
   activeRater: string;
   activeMode: "Training" | "Cold Read" | "Warm Read" | "Validation";
   answers: Record<string, { value: string; confidence: number; comment: string }>;
@@ -12,23 +13,28 @@ interface AuditFormProps {
     variableId: string, 
     data: { value: string; confidence: number; comment: string }
   ) => void;
+  onNextSegment: () => void;
+  isLastSegment: boolean;
 }
 
 export default function AuditForm({
   variables,
   currentImageId,
+  currentImage,
   activeRater,
   activeMode,
   answers,
-  onSaveAnswer
+  onSaveAnswer,
+  onNextSegment,
+  isLastSegment
 }: AuditFormProps) {
   // Collapsed states per domain
   const [collapsedDomains, setCollapsedDomains] = useState<Record<string, boolean>>({
-    "Pedestrian Infrastructure": false,
-    "Crossing Infrastructure": false,
-    "Pedestrian Space Occupation": false,
-    "Traffic Environment": false,
-    "Holistic Walkability": false
+    "Section A – Structured Street Audit": false,
+    "Section B – Walkability Assessment": false,
+    "Section C – Visible Problems": false,
+    "Section D – Image Visibility": false,
+    "Section E – Optional Comment": false
   });
 
   // Modal target for the active variable info popups
@@ -61,25 +67,30 @@ export default function AuditForm({
   const handleValueChange = (variableId: string, value: string) => {
     const existing = answers[variableId] || { value: "", confidence: 4, comment: "" };
     
+    // Toggle: if clicked option is already selected, deselect it (set to "")
+    const newValue = existing.value === value ? "" : value;
+    
     // Custom dependency cascades
-    // E.g., if we mark "footway_present" as "Absent", we clear/disable sub-metrics
-    if (variableId === "footway_present" && value === "Absent") {
-      // Trigger save of children variables as "N/A"
-      variables.forEach((variable) => {
-        if (variable.requires?.variableId === "footway_present") {
-          let defaultValue = "N/A";
-          if (variable.id === "footway_continuity") defaultValue = "No Footway";
-          onSaveAnswer(variable.id, { value: defaultValue, confidence: 5, comment: "Automatically set due to absence of footway structure." });
+    if (variableId === "footway_presence") {
+      if (newValue === "Absent") {
+        onSaveAnswer("footway_condition", { value: "Not Applicable", confidence: 5, comment: "Automatically set because Footway is Absent." });
+        onSaveAnswer("footway_obstructions", { value: "Not Applicable", confidence: 5, comment: "Automatically set because Footway is Absent." });
+        onSaveAnswer("encroachment", { value: "Not Applicable", confidence: 5, comment: "Automatically set because Footway is Absent." });
+      } else if (newValue === "Present" || newValue === "Partially Present") {
+        // Reset from "Not Applicable" to empty
+        if (answers["footway_condition"]?.value === "Not Applicable") {
+          onSaveAnswer("footway_condition", { value: "", confidence: 4, comment: "" });
         }
-      });
+        if (answers["footway_obstructions"]?.value === "Not Applicable") {
+          onSaveAnswer("footway_obstructions", { value: "", confidence: 4, comment: "" });
+        }
+        if (answers["encroachment"]?.value === "Not Applicable") {
+          onSaveAnswer("encroachment", { value: "", confidence: 4, comment: "" });
+        }
+      }
     }
 
-    onSaveAnswer(variableId, { ...existing, value });
-  };
-
-  const handleConfidenceChange = (variableId: string, confidence: number) => {
-    const existing = answers[variableId] || { value: "", confidence: 4, comment: "" };
-    onSaveAnswer(variableId, { ...existing, confidence });
+    onSaveAnswer(variableId, { ...existing, value: newValue });
   };
 
   const handleCommentChange = (variableId: string, comment: string) => {
@@ -101,11 +112,12 @@ export default function AuditForm({
             </span>
           </div>
         </div>
-
       </div>
 
       {/* Structured domains */}
-      <div className="flex-1 overflow-y-auto p-2.5 space-y-2.5">
+      <div className="flex-1 overflow-y-auto p-2.5 space-y-2.5 animate-fade-in">
+        
+
         {domains.map((domain) => {
           const domainVars = variables.filter((v) => v.domain === domain);
           const isCollapsed = collapsedDomains[domain];
@@ -113,7 +125,7 @@ export default function AuditForm({
           // Count completed variables in this domain
           const completedCount = domainVars.filter((v) => {
             const { disabled } = checkIsDisabled(v);
-            return disabled || (answers[v.id]?.value && answers[v.id]?.value !== "");
+            return disabled || (answers[v.id]?.value !== undefined && answers[v.id]?.value !== "");
           }).length;
 
           return (
@@ -155,16 +167,22 @@ export default function AuditForm({
                             </span>
                             <span className="text-xs font-semibold text-slate-800 leading-tight">
                               {v.name}
+                              {!disabled && v.id !== "image_visibility" && v.id !== "additional_comments" && (
+                                <span className="text-red-500 font-bold ml-0.5" title="Mandatory question">*</span>
+                              )}
                             </span>
                           </div>
                           
-                          <button
-                            onClick={() => setInfoTarget(v)}
-                            className="p-1 text-slate-400 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 rounded transition-colors cursor-pointer border border-slate-200/40"
-                            title="Review codebook, definitions, & examples"
-                          >
-                            <Info className="h-3 w-3" />
-                          </button>
+                          {/* Only show info modal trigger if codebook exists */}
+                          {v.definition && v.evidence && (
+                            <button
+                              onClick={() => setInfoTarget(v)}
+                              className="p-1 text-slate-400 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 rounded transition-colors cursor-pointer border border-slate-200/40"
+                              title="Review codebook, definitions, & examples"
+                            >
+                              <Info className="h-3 w-3" />
+                            </button>
+                          )}
                         </div>
 
                         {disabled ? (
@@ -176,62 +194,83 @@ export default function AuditForm({
                         ) : (
                           /* RATING SECTION */
                           <div className="space-y-2">
-                            {/* Options Radio List */}
-                            <div className="flex flex-wrap gap-1">
-                              {v.options.map((opt) => (
-                                <button
-                                  key={opt}
-                                  onClick={() => handleValueChange(v.id, opt)}
-                                  className={`px-2 py-1 rounded text-[11px] font-semibold border transition-all cursor-pointer ${
-                                    ans.value === opt
-                                      ? "bg-slate-900 border-slate-900 text-white shadow-none"
-                                      : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
-                                  }`}
-                                >
-                                  {opt}
-                                </button>
-                              ))}
+                            {v.isText ? (
+                              /* TEXT-ONLY QUESTION RENDERING */
+                              <div className="pt-1">
+                                <textarea
+                                  value={ans.value}
+                                  onChange={(e) => onSaveAnswer(v.id, { ...ans, value: e.target.value })}
+                                  placeholder="Provide any observations that influenced your ratings but were not captured above..."
+                                  className="w-full bg-slate-50 focus:bg-white border border-slate-200 focus:border-slate-400 rounded p-1.5 text-[11px] transition-all outline-none font-sans leading-snug h-20 resize-y"
+                                />
+                              </div>
+                            ) : v.isMulti ? (
+                              /* MULTI-SELECT CHECKBOX RENDERING */
+                              <div className="flex flex-wrap gap-1">
+                                {v.options.map((opt) => {
+                                  const selectedValues = ans.value ? ans.value.split(", ").map(x => x.trim()) : [];
+                                  const isSelected = selectedValues.includes(opt);
 
-                              {/* Unknown Option */}
-                              <button
-                                onClick={() => handleValueChange(v.id, "Unknown")}
-                                className={`px-2 py-1 rounded text-[11px] font-semibold border transition-all cursor-pointer ${
-                                  ans.value === "Unknown"
-                                    ? "bg-amber-700 border-amber-700 text-white shadow-none"
-                                    : "bg-white border-slate-200 text-amber-700 hover:border-amber-350"
-                                }`}
-                              >
-                                Unknown
-                              </button>
-                            </div>
-
-                            {/* Confidence Rating (1-5 Stars) */}
-                            {ans.value !== "" && ans.value !== "N/A" && (
-                              <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between">
-                                <span className="text-[10px] font-medium text-slate-500 font-mono">Confidence:</span>
-                                <div className="flex items-center space-x-0.5">
-                                  {[1, 2, 3, 4, 5].map((stars) => (
+                                  return (
                                     <button
-                                      key={stars}
-                                      onClick={() => handleConfidenceChange(v.id, stars)}
-                                      className="p-0.5 hover:scale-105 transition-transform cursor-pointer"
-                                      title={`Level ${stars}`}
+                                      key={opt}
+                                      onClick={() => {
+                                        let newValues: string[];
+                                        if (isSelected) {
+                                          newValues = selectedValues.filter(x => x !== opt);
+                                        } else {
+                                          newValues = [...selectedValues, opt];
+                                        }
+                                        const newValueString = newValues.join(", ");
+                                        onSaveAnswer(v.id, { ...ans, value: newValueString });
+                                      }}
+                                      className={`px-2 py-1 rounded text-[11px] font-semibold border transition-all cursor-pointer ${
+                                        isSelected
+                                          ? "bg-indigo-600 border-indigo-600 text-white shadow-none"
+                                          : "bg-white border-slate-200 text-slate-700 hover:border-slate-350"
+                                      }`}
                                     >
-                                      <Star 
-                                        className={`h-3.5 w-3.5 ${
-                                          stars <= ans.confidence 
-                                            ? "text-amber-400 fill-amber-400" 
-                                            : "text-slate-200"
-                                        }`} 
-                                      />
+                                      {isSelected ? "✓ " : ""}
+                                      {opt}
                                     </button>
-                                  ))}
-                                </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              /* STANDARD RADIO OPTION RENDERING */
+                              <div className="flex flex-wrap gap-1">
+                                {v.options.map((opt) => (
+                                  <button
+                                    key={opt}
+                                    onClick={() => handleValueChange(v.id, opt)}
+                                    className={`px-2 py-1 rounded text-[11px] font-semibold border transition-all cursor-pointer ${
+                                      ans.value === opt
+                                        ? "bg-slate-900 border-slate-900 text-white shadow-none"
+                                        : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
+                                    }`}
+                                  >
+                                    {opt}
+                                  </button>
+                                ))}
+
+                                {/* Cannot Determine Option */}
+                                {v.id !== "overall_walkability" && v.id !== "safety" && v.id !== "comfort" && v.id !== "pleasurability" && !v.options.includes("Cannot Determine") && (
+                                  <button
+                                    onClick={() => handleValueChange(v.id, "Cannot Determine")}
+                                    className={`px-2 py-1 rounded text-[11px] font-semibold border transition-all cursor-pointer ${
+                                      ans.value === "Cannot Determine"
+                                        ? "bg-amber-700 border-amber-700 text-white shadow-none"
+                                        : "bg-white border-slate-200 text-amber-700 hover:border-amber-350"
+                                    }`}
+                                  >
+                                    Cannot Determine
+                                  </button>
+                                )}
                               </div>
                             )}
 
                             {/* Qualitative Comments */}
-                            {ans.value !== "" && (
+                            {!v.isText && ans.value !== "" && (
                               <div className="pt-1">
                                 <textarea
                                   value={ans.comment}
@@ -258,6 +297,16 @@ export default function AuditForm({
             </div>
           );
         })}
+      </div>
+
+      {/* Submit & Next Button */}
+      <div className="pt-3.5 border-t border-slate-200 p-2.5 flex justify-end">
+        <button
+          onClick={onNextSegment}
+          className="w-full sm:w-auto px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-[11px] rounded transition-colors cursor-pointer border border-slate-950 flex items-center justify-center gap-1.5 shadow-sm font-mono tracking-wide"
+        >
+          {isLastSegment ? "Submit & Complete Session" : "Submit & Next Panorama"}
+        </button>
       </div>
 
       {/* Codebook Definitions Modal */}
@@ -293,35 +342,43 @@ export default function AuditForm({
                 <p className="text-slate-600 bg-slate-50 p-2 rounded border border-slate-200/60 leading-normal text-[11px]">{infoTarget.definition}</p>
               </div>
 
-              <div>
-                <h4 className="font-bold text-[10px] text-slate-900 uppercase tracking-wide font-mono mb-0.5">Observable Evidence Rules:</h4>
-                <p className="text-slate-600 leading-normal text-[11px]">{infoTarget.evidence}</p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <div className="p-2 border border-green-200 bg-green-50/30 rounded">
-                  <h5 className="font-bold text-[10px] text-green-950 uppercase tracking-wider font-mono mb-0.5">Positive Examples (+):</h5>
-                  <ul className="list-disc pl-3.5 space-y-0.5 text-[11px] text-green-900">
-                    {infoTarget.positiveExamples.map((ex, idx) => (
-                      <li key={idx}>{ex}</li>
-                    ))}
-                  </ul>
+              {infoTarget.evidence && (
+                <div>
+                  <h4 className="font-bold text-[10px] text-slate-900 uppercase tracking-wide font-mono mb-0.5">Observable Evidence Rules:</h4>
+                  <p className="text-slate-600 leading-normal text-[11px]">{infoTarget.evidence}</p>
                 </div>
+              )}
 
-                <div className="p-2 border border-red-200 bg-red-50/30 rounded">
-                  <h5 className="font-bold text-[10px] text-red-950 uppercase tracking-wider font-mono mb-0.5">Negative Examples (-):</h5>
-                  <ul className="list-disc pl-3.5 space-y-0.5 text-[11px] text-red-900">
-                    {infoTarget.negativeExamples.map((ex, idx) => (
-                      <li key={idx}>{ex}</li>
-                    ))}
-                  </ul>
+              {infoTarget.positiveExamples && infoTarget.positiveExamples.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div className="p-2 border border-green-200 bg-green-50/30 rounded">
+                    <h5 className="font-bold text-[10px] text-green-950 uppercase tracking-wider font-mono mb-0.5">Positive Examples (+):</h5>
+                    <ul className="list-disc pl-3.5 space-y-0.5 text-[11px] text-green-900">
+                      {infoTarget.positiveExamples.map((ex, idx) => (
+                        <li key={idx}>{ex}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {infoTarget.negativeExamples && infoTarget.negativeExamples.length > 0 && (
+                    <div className="p-2 border border-red-200 bg-red-50/30 rounded">
+                      <h5 className="font-bold text-[10px] text-red-950 uppercase tracking-wider font-mono mb-0.5">Negative Examples (-):</h5>
+                      <ul className="list-disc pl-3.5 space-y-0.5 text-[11px] text-red-900">
+                        {infoTarget.negativeExamples.map((ex, idx) => (
+                          <li key={idx}>{ex}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
 
-              <div className="p-2 border border-amber-200 bg-amber-50/30 rounded">
-                <h4 className="font-bold text-[10px] text-amber-950 uppercase tracking-wide font-mono mb-0.5">Unknown Rule:</h4>
-                <p className="text-[11px] text-amber-900 leading-normal">{infoTarget.unknownRule}</p>
-              </div>
+              {infoTarget.unknownRule && (
+                <div className="p-2 border border-amber-200 bg-amber-50/30 rounded">
+                  <h4 className="font-bold text-[10px] text-amber-950 uppercase tracking-wide font-mono mb-0.5">Unknown Rule:</h4>
+                  <p className="text-[11px] text-amber-900 leading-normal">{infoTarget.unknownRule}</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

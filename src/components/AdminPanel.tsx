@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { 
-  FolderSync, UserPlus, Trash2, Key, Lock, Unlock, Download, Calendar, Play, AlertCircle, CheckCircle, Database 
+  FolderSync, UserPlus, Trash2, Key, Lock, Unlock, Download, Calendar, Play, AlertCircle, CheckCircle, Database, Shuffle, RefreshCw, Sparkles 
 } from "lucide-react";
 import { StreetViewImage, AuditRecord } from "../types";
 
@@ -9,6 +9,7 @@ interface AdminPanelProps {
   audits: AuditRecord[];
   raters: string[];
   googleApiKey: string;
+  hasGoogleApiKey: boolean;
   googleDriveFolderId: string;
   instrumentLocked: boolean;
   calibrationPhase: "Cold Read" | "Warm Read" | "Reconciliation";
@@ -20,9 +21,19 @@ interface AdminPanelProps {
     googleApiKey?: string;
     googleDriveFolderId?: string;
     instrumentLocked?: boolean;
+    autoAssignEnabled?: boolean;
+    autoAssignCount?: number;
   }) => void;
   onTriggerDriveSync: (apiKey: string, folderId: string) => Promise<{ success: boolean; message: string }>;
   onClearAudits: () => void;
+  onShuffleImages: (count: number) => Promise<{ success: boolean; message: string }>;
+  onResetImages: () => Promise<{ success: boolean; message: string }>;
+  onAssignImages: (auditorId: string, count: number) => Promise<{ success: boolean; message: string }>;
+  onUnassignImages: (auditorId: string) => Promise<{ success: boolean; message: string }>;
+  auditorImages: Record<string, string[]>;
+  auditorProfiles: Record<string, any>;
+  autoAssignEnabled: boolean;
+  autoAssignCount: number;
 }
 
 export default function AdminPanel({
@@ -30,15 +41,25 @@ export default function AdminPanel({
   audits,
   raters,
   googleApiKey,
+  hasGoogleApiKey,
   googleDriveFolderId,
   instrumentLocked,
   calibrationPhase,
   currentProject,
   onSaveSettings,
   onTriggerDriveSync,
-  onClearAudits
+  onClearAudits,
+  onShuffleImages,
+  onResetImages,
+  onAssignImages,
+  onUnassignImages,
+  auditorImages,
+  auditorProfiles,
+  autoAssignEnabled,
+  autoAssignCount
 }: AdminPanelProps) {
   const [newRater, setNewRater] = useState("");
+  const [assignCountMap, setAssignCountMap] = useState<Record<string, number>>({});
   const [apiKeyInput, setApiKeyInput] = useState(googleApiKey);
   const [folderIdInput, setFolderIdInput] = useState(googleDriveFolderId);
   const [syncStatus, setSyncStatus] = useState<{ type: "success" | "error" | "loading" | null; message: string }>({
@@ -47,6 +68,48 @@ export default function AdminPanel({
   });
   const [isSyncing, setIsSyncing] = useState(false);
   const [projectNameInput, setProjectNameInput] = useState(currentProject);
+  
+  // Sizing and shuffle states
+  const [sessionCount, setSessionCount] = useState(25);
+  const [isSizing, setIsSizing] = useState(false);
+  const [sizeStatus, setSizeStatus] = useState<{ type: "success" | "error" | null; message: string }>({
+    type: null,
+    message: ""
+  });
+
+  const handleShuffleLimit = async () => {
+    setIsSizing(true);
+    setSizeStatus({ type: null, message: "" });
+    try {
+      const res = await onShuffleImages(sessionCount);
+      if (res.success) {
+        setSizeStatus({ type: "success", message: res.message });
+      } else {
+        setSizeStatus({ type: "error", message: res.message || "Failed to configure queue." });
+      }
+    } catch (e: any) {
+      setSizeStatus({ type: "error", message: e.message || "An unexpected error occurred." });
+    } finally {
+      setIsSizing(false);
+    }
+  };
+
+  const handleResetImages = async () => {
+    setIsSizing(true);
+    setSizeStatus({ type: null, message: "" });
+    try {
+      const res = await onResetImages();
+      if (res.success) {
+        setSizeStatus({ type: "success", message: res.message });
+      } else {
+        setSizeStatus({ type: "error", message: res.message || "Failed to reset queue." });
+      }
+    } catch (e: any) {
+      setSizeStatus({ type: "error", message: e.message || "An unexpected error occurred." });
+    } finally {
+      setIsSizing(false);
+    }
+  };
 
   // 1. Export as CSV
   const handleExportCSV = () => {
@@ -151,9 +214,50 @@ export default function AdminPanel({
     onSaveSettings({ currentProject: projectNameInput.trim() });
   };
 
+  // Coverage stats. "Images audited" = distinct panoramas that have at least one
+  // human (non-AI) evaluation. A per-rater breakdown is also computed for the team card.
+  const auditedByRater: Record<string, Set<string>> = {};
+  audits.forEach((a) => {
+    if (!auditedByRater[a.auditorId]) auditedByRater[a.auditorId] = new Set();
+    auditedByRater[a.auditorId].add(a.imageId);
+  });
+  const auditedImageCount = new Set(
+    audits.filter((a) => a.auditorId !== "Gemini-3.5-Flash").map((a) => a.imageId)
+  ).size;
+
   return (
     <div className="space-y-3 text-slate-800 font-sans animate-fade-in" id="vlsap-admin-panel">
-      
+
+      {/* Study coverage summary */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div className="bg-white border border-slate-200/85 rounded p-3 shadow-none">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[9px] font-mono font-bold uppercase text-slate-400">Catalog Images</span>
+            <Database className="h-4 w-4 text-slate-400" />
+          </div>
+          <div className="text-xl font-extrabold text-slate-900 font-mono">{images.length}</div>
+          <div className="text-[9px] text-slate-400 font-mono">Panoramas in active queue</div>
+        </div>
+
+        <div className="bg-white border border-slate-200/85 rounded p-3 shadow-none border-l-2 border-l-emerald-500">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[9px] font-mono font-bold uppercase text-slate-400">Images Audited</span>
+            <CheckCircle className="h-4 w-4 text-emerald-500" />
+          </div>
+          <div className="text-xl font-extrabold text-emerald-700 font-mono">{auditedImageCount}</div>
+          <div className="text-[9px] text-slate-400 font-mono">Distinct images with a human evaluation</div>
+        </div>
+
+        <div className="bg-white border border-slate-200/85 rounded p-3 shadow-none col-span-2 md:col-span-1">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[9px] font-mono font-bold uppercase text-slate-400">Total Evaluations</span>
+            <Sparkles className="h-4 w-4 text-indigo-500" />
+          </div>
+          <div className="text-xl font-extrabold text-slate-900 font-mono">{audits.length}</div>
+          <div className="text-[9px] text-slate-400 font-mono">Records across all raters &amp; AI</div>
+        </div>
+      </div>
+
       {/* 2-Column Core settings layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         
@@ -181,9 +285,16 @@ export default function AdminPanel({
                   type="password"
                   value={apiKeyInput}
                   onChange={(e) => setApiKeyInput(e.target.value)}
-                  placeholder="Enter Google API Key"
+                  placeholder={hasGoogleApiKey ? "A key is configured — enter a new one to replace it" : "Enter Google API Key"}
                   className="w-full bg-slate-50 border border-slate-200/85 focus:border-slate-400 rounded pl-7 pr-2.5 py-1 text-[11px] transition-all outline-none font-mono"
                 />
+                <span className={`absolute right-2 top-1.5 text-[8px] font-mono font-bold uppercase px-1 rounded-sm border ${
+                  hasGoogleApiKey
+                    ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                    : "bg-slate-100 border-slate-200 text-slate-500"
+                }`}>
+                  {hasGoogleApiKey ? "Configured" : "Not set"}
+                </span>
               </div>
 
               <div className="flex items-center space-x-1.5">
@@ -257,11 +368,15 @@ export default function AdminPanel({
 
           <div className="grid grid-cols-1 gap-1.5 h-32 overflow-y-auto pr-1">
             {(() => {
-              let profilesDetails: any = {};
+              let localDetails: any = {};
               try {
                 const localProfilesStr = localStorage.getItem("vlsap_auditor_profiles_details") || "{}";
-                profilesDetails = JSON.parse(localProfilesStr);
+                localDetails = JSON.parse(localProfilesStr);
               } catch (e) {}
+
+              // Prefer server-synced profiles (all devices) and fall back to this
+              // device's local cache so every auditor's details are shown.
+              const profilesDetails: any = { ...localDetails, ...(auditorProfiles || {}) };
 
               return raters.map((rater) => {
                 const details = profilesDetails[rater];
@@ -282,7 +397,7 @@ export default function AdminPanel({
                         </button>
                       )}
                     </div>
-                    {details ? (
+                     {details ? (
                       <div className="text-[9px] text-slate-500 font-sans grid grid-cols-2 gap-x-2 gap-y-0.5 border-t border-slate-200/50 pt-1 mt-0.5">
                         <div>Gender: <span className="font-semibold text-slate-700">{details.gender}</span></div>
                         <div>Age: <span className="font-semibold text-slate-700">{details.age}</span></div>
@@ -292,6 +407,62 @@ export default function AdminPanel({
                     ) : (
                       <span className="text-[8px] text-slate-400 font-sans italic border-t border-slate-100 pt-0.5">Core calibration rater (no profile metadata)</span>
                     )}
+
+                    {/* Queue Assignment Sub-section */}
+                    <div className="border-t border-slate-200/50 pt-1.5 mt-1.5 flex flex-col gap-1">
+                      <div className="flex items-center justify-between text-[8px] font-sans">
+                        <span className="text-slate-500 font-semibold">Images Audited:</span>
+                        <span className="bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold px-1 rounded-sm">
+                          {auditedByRater[rater]?.size || 0}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[8px] font-sans">
+                        <span className="text-slate-500 font-semibold">Queue Scope:</span>
+                        {auditorImages[rater] && auditorImages[rater].length > 0 ? (
+                          <span className="bg-amber-100 border border-amber-200 text-amber-800 font-bold px-1 rounded-sm">
+                            Assigned {auditorImages[rater].length} images
+                          </span>
+                        ) : (
+                          <span className="bg-slate-100 border border-slate-200 text-slate-600 font-bold px-1 rounded-sm">
+                            Full Catalog
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <input
+                          type="number"
+                          min="1"
+                          max="1000"
+                          placeholder="25"
+                          value={assignCountMap[rater] ?? 25}
+                          onChange={(e) => {
+                            const val = Math.max(1, Number(e.target.value) || 25);
+                            setAssignCountMap(prev => ({ ...prev, [rater]: val }));
+                          }}
+                          className="w-10 bg-white border border-slate-200 rounded px-1 py-0.5 text-center font-bold text-[9px] outline-none"
+                        />
+                        <button
+                          onClick={async () => {
+                            const cnt = assignCountMap[rater] ?? 25;
+                            await onAssignImages(rater, cnt);
+                          }}
+                          className="px-1.5 py-0.5 bg-slate-900 text-white font-bold text-[9px] rounded hover:bg-slate-800 cursor-pointer"
+                        >
+                          Assign
+                        </button>
+                        {auditorImages[rater] && auditorImages[rater].length > 0 && (
+                          <button
+                            onClick={async () => {
+                              await onUnassignImages(rater);
+                            }}
+                            className="px-1.5 py-0.5 bg-white border border-slate-200 text-red-600 hover:text-red-700 font-bold text-[9px] rounded cursor-pointer"
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 );
               });
@@ -401,6 +572,100 @@ export default function AdminPanel({
                   </>
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 5: Audit Session Sizing & Randomization */}
+        <div className="bg-white border border-slate-200/80 rounded p-3 shadow-none space-y-2.5">
+          <div className="flex items-center space-x-2 border-b border-slate-100 pb-2">
+            <Sparkles className="h-4 w-4 text-amber-500 animate-pulse" />
+            <div>
+              <h3 className="text-xs font-bold text-slate-900 leading-tight">Session Sizing & Randomization</h3>
+              <p className="text-[9px] text-slate-400 font-mono">Limit active queues to random subsets of images</p>
+            </div>
+          </div>
+
+          <div className="space-y-2.5 text-xs">
+            <p className="text-slate-500 leading-normal text-[11px]">
+              Set a calibration segment (e.g. 25 random images) for your raters. All raters will see the same randomized sequence.
+            </p>
+
+            <div className="flex items-center gap-2 bg-slate-50 p-2 rounded border border-slate-200">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[8px] font-bold text-slate-500 uppercase font-mono">Images count</span>
+                <input
+                  type="number"
+                  min="1"
+                  max="1000"
+                  value={sessionCount}
+                  onChange={(e) => setSessionCount(Math.max(1, Number(e.target.value) || 25))}
+                  className="w-16 bg-white border border-slate-200 rounded px-1.5 py-0.5 text-center font-bold text-[11px] outline-none"
+                />
+              </div>
+
+              <div className="flex-1 flex flex-col gap-1">
+                <button
+                  onClick={handleShuffleLimit}
+                  disabled={isSizing}
+                  className="w-full py-1 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-bold text-[10px] rounded transition-colors cursor-pointer border border-slate-950 flex items-center justify-center gap-1"
+                >
+                  <Shuffle className="h-3 w-3" />
+                  {isSizing ? "Processing..." : `Shuffle & Limit to ${sessionCount}`}
+                </button>
+
+                <button
+                  onClick={handleResetImages}
+                  disabled={isSizing}
+                  className="w-full py-1 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold text-[10px] rounded cursor-pointer flex items-center justify-center gap-1"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                  Restore Full Catalog ({images.length})
+                </button>
+              </div>
+            </div>
+
+            {sizeStatus.type && (
+              <div className={`p-1.5 rounded text-[10px] flex items-center gap-1 border ${
+                sizeStatus.type === "success" 
+                  ? "bg-emerald-50 border-emerald-150 text-emerald-700" 
+                  : "bg-red-50 border-red-150 text-red-700"
+              }`}>
+                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                <span>{sizeStatus.message}</span>
+              </div>
+            )}
+
+            {/* Automatic Assignment Trigger Section */}
+            <div className="pt-2.5 border-t border-slate-200 mt-2.5 space-y-2 text-xs">
+              <span className="text-[10px] font-bold text-slate-800 uppercase font-mono tracking-wider block">Automatic Assignment Settings</span>
+              
+              <label className="flex items-center space-x-2 text-[11px] text-slate-600 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autoAssignEnabled}
+                  onChange={(e) => onSaveSettings({ autoAssignEnabled: e.target.checked })}
+                  className="rounded border-slate-350 text-slate-900 focus:ring-0"
+                />
+                <span className="font-semibold text-slate-700">Auto-assign tasks to new/unassigned raters</span>
+              </label>
+
+              {autoAssignEnabled && (
+                <div className="flex items-center justify-between bg-slate-50 p-2 rounded border border-slate-200">
+                  <span className="text-[10px] text-slate-500 font-mono">Assigned subset size:</span>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min="1"
+                      max="1000"
+                      value={autoAssignCount}
+                      onChange={(e) => onSaveSettings({ autoAssignCount: Math.max(1, Number(e.target.value) || 25) })}
+                      className="w-14 bg-white border border-slate-200 rounded px-1 py-0.5 text-center font-bold text-[10px] outline-none"
+                    />
+                    <span className="text-[10px] text-slate-400 font-mono">images</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

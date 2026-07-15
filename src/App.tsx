@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { 
   Compass, LayoutDashboard, Settings, Award, ArrowLeft, ArrowRight, Upload, Sparkles, 
-  UserCheck, Eye, RefreshCw, Layers, User, Bot, ShieldCheck, LogOut
+  UserCheck, Eye, RefreshCw, Layers, User, Bot, ShieldCheck, LogOut, Shuffle, AlertCircle
 } from "lucide-react";
 import RaterInstructions from "./components/RaterInstructions";
 import ImageViewer from "./components/ImageViewer";
@@ -31,13 +31,31 @@ export default function App() {
   const [currentProject, setCurrentProject] = useState("VLSAP Calibration Micro-Pilot");
   const [calibrationPhase, setCalibrationPhase] = useState<"Cold Read" | "Warm Read" | "Reconciliation">("Cold Read");
   const [googleApiKey, setGoogleApiKey] = useState("");
+  const [hasGoogleApiKey, setHasGoogleApiKey] = useState(false);
   const [googleDriveFolderId, setGoogleDriveFolderId] = useState("1ENECfT_ETGATB4533yAEKRZ-HugbMbad");
   const [instrumentLocked, setInstrumentLocked] = useState(false);
+  const [auditorImages, setAuditorImages] = useState<Record<string, string[]>>({});
+  const [auditorProfiles, setAuditorProfiles] = useState<Record<string, any>>({});
+  const [autoAssignEnabled, setAutoAssignEnabled] = useState(true);
+  const [autoAssignCount, setAutoAssignCount] = useState(25);
 
   // Active Session State
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isAiAuditing, setIsAiAuditing] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+
+  // Filtered images list assigned to the logged-in auditor
+  const activeImages = React.useMemo(() => {
+    if (!auditorProfile) return images;
+    
+    const assignedIds = auditorImages[auditorProfile];
+    if (assignedIds && assignedIds.length > 0) {
+      return images.filter((img) => assignedIds.includes(img.id));
+    }
+    
+    // Return empty list if logged in but no images assigned
+    return [];
+  }, [images, auditorProfile, auditorImages]);
 
   // Variables definitions (loaded from JSON)
   const variables = variablesData as VLSAPVariable[];
@@ -54,8 +72,13 @@ export default function App() {
         setCurrentProject(state.currentProject || "VLSAP Calibration Micro-Pilot");
         setCalibrationPhase(state.calibrationPhase || "Cold Read");
         setGoogleApiKey(state.googleApiKey || "");
+        setHasGoogleApiKey((state as any).hasGoogleApiKey ?? false);
         setGoogleDriveFolderId(state.googleDriveFolderId || "1ENECfT_ETGATB4533yAEKRZ-HugbMbad");
         setInstrumentLocked(state.instrumentLocked || false);
+        setAuditorImages(state.auditorImages || {});
+        setAuditorProfiles(state.auditorProfiles || {});
+        setAutoAssignEnabled(state.autoAssignEnabled ?? true);
+        setAutoAssignCount(state.autoAssignCount ?? 25);
       }
     } catch (e) {
       console.error("Failed to connect to full-stack server state API:", e);
@@ -83,6 +106,16 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("vlsap_active_view", activeView);
   }, [activeView]);
+
+  // Automatically assign random images if a logged-in rater has no active assignment
+  useEffect(() => {
+    if (!loading && autoAssignEnabled && auditorProfile && images.length > 0) {
+      const assigned = auditorImages[auditorProfile];
+      if (!assigned || assigned.length === 0) {
+        handleAssignImages(auditorProfile, autoAssignCount);
+      }
+    }
+  }, [auditorProfile, auditorImages, loading, images, autoAssignEnabled, autoAssignCount]);
 
   const handleAcceptInstructions = () => {
     localStorage.setItem("vlsap_instructions_accepted", "true");
@@ -127,18 +160,75 @@ export default function App() {
     handleSelectProfile(cleanRaterId);
   };
 
+  // Navigation that changes active image index
+  const navigateImage = (newIndexOrFn: number | ((prev: number) => number)) => {
+    // Check if there is an active auditor session and an active image
+    const currentImage = activeImages[currentImageIndex];
+    if (auditorProfile && currentImage) {
+      const activeRater = auditorProfile;
+      const mode = calibrationPhase === "Reconciliation" ? "Validation" : calibrationPhase;
+      
+      // Get all current answers for this image
+      const currentImageAnswers = audits.filter(
+        (a) =>
+          a.imageId === currentImage.id &&
+          a.auditorId === activeRater &&
+          a.mode === mode &&
+          a.protocol === "A"
+      );
+
+      // Find active variables that don't have a value
+      const unanswered = variables.filter((v) => {
+        // Evaluate requirements to see if this variable is enabled
+        if (v.requires) {
+          const depAns = currentImageAnswers.find(a => a.variableId === v.requires?.variableId)?.value;
+          if (depAns !== v.requires.value) {
+            return false; // Disabled by dependency rule
+          }
+        }
+        
+        // Check if an answer choice has been selected
+        const answerVal = currentImageAnswers.find(a => a.variableId === v.id)?.value;
+        return !answerVal || answerVal === "";
+      });
+
+      if (unanswered.length > 0) {
+        alert(`Please answer all active questions before leaving this panorama.\n\nMissing: ${unanswered.map(v => v.name).join(", ")}`);
+        return; // Block navigation
+      }
+    }
+
+    setCurrentImageIndex((prev) => {
+      const nextIdx = typeof newIndexOrFn === "function" ? newIndexOrFn(prev) : newIndexOrFn;
+      return Math.max(0, Math.min(activeImages.length - 1, nextIdx));
+    });
+  };
+
   // Logout auditor
   const handleLogoutAuditor = () => {
     setAuditorProfile(null);
     localStorage.removeItem("vlsap_auditor_profile");
   };
 
+  // Protect AI Audit and Admin Dashboard with a password gate
+  const handleSecureNavigation = (view: "ai" | "admin") => {
+    const password = window.prompt(`Please enter the security password to access the ${view === "admin" ? "Admin Dashboard" : "AI Audit Interface"}:`);
+    if (password === "anshulWER") {
+      setActiveView(view);
+    } else if (password !== null) {
+      alert("Incorrect password! Access denied.");
+    }
+  };
+
   // Immediate autosave mechanism to server db
   const handleSaveAnswer = async (
-    variableId: string, 
+    variableId: string,
     data: { value: string; confidence: number; comment: string }
   ) => {
-    const activeImage = images[currentImageIndex];
+    // Must mirror the list the auditor is actually viewing (activeImages), which is the
+    // rater's assigned subset. Using the full `images` list here saved answers against the
+    // wrong image and made the selection appear to do nothing.
+    const activeImage = activeImages[currentImageIndex];
     const activeRater = auditorProfile || "Rater A";
     if (!activeImage) return;
 
@@ -210,8 +300,13 @@ export default function App() {
         setCurrentProject(data.state.currentProject || "VLSAP Calibration Micro-Pilot");
         setCalibrationPhase(data.state.calibrationPhase || "Cold Read");
         setGoogleApiKey(data.state.googleApiKey || "");
+        setHasGoogleApiKey(data.state.hasGoogleApiKey ?? false);
         setGoogleDriveFolderId(data.state.googleDriveFolderId || "1ENECfT_ETGATB4533yAEKRZ-HugbMbad");
         setInstrumentLocked(data.state.instrumentLocked || false);
+        setAuditorImages(data.state.auditorImages || {});
+        setAuditorProfiles(data.state.auditorProfiles || {});
+        setAutoAssignEnabled(data.state.autoAssignEnabled ?? true);
+        setAutoAssignCount(data.state.autoAssignCount ?? 25);
       }
     } catch (e) {
       console.error("Failed to update server settings:", e);
@@ -241,9 +336,90 @@ export default function App() {
     if (data.success) {
       setImages(data.images);
       setGoogleApiKey(apiKey);
+      if (apiKey) setHasGoogleApiKey(true);
       setGoogleDriveFolderId(folderId);
     }
     return { success: data.success, message: data.message };
+  };
+
+  // Shuffle and Limit active queue
+  const handleShuffleImages = async (count: number) => {
+    try {
+      const res = await fetch("/api/images/shuffle-limit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ count })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setImages(data.images);
+        setCurrentImageIndex(0); // reset page index to first image of new queue
+        return { success: true, message: data.message };
+      }
+      return { success: false, message: data.error || "Failed to size queue." };
+    } catch (e: any) {
+      console.error(e);
+      return { success: false, message: e.message || "Network error occurred." };
+    }
+  };
+
+  // Reset/Restore full images list from bundled catalog
+  const handleResetImages = async () => {
+    try {
+      const res = await fetch("/api/images/reset", { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        setImages(data.images);
+        setCurrentImageIndex(0);
+        return { success: true, message: data.message };
+      }
+      return { success: false, message: data.error || "Failed to reset catalog." };
+    } catch (e: any) {
+      console.error(e);
+      return { success: false, message: e.message || "Network error occurred." };
+    }
+  };
+
+  // Assign a custom number of random images to a specific auditor
+  const handleAssignImages = async (auditorId: string, count: number) => {
+    try {
+      const res = await fetch("/api/images/assign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ auditorId, count })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAuditorImages(data.state.auditorImages || {});
+        setCurrentImageIndex(0); // reset page index to first image of new queue
+        return { success: true, message: data.message };
+      }
+      return { success: false, message: data.error || "Failed to assign images." };
+    } catch (e: any) {
+      console.error(e);
+      return { success: false, message: e.message || "Network error occurred." };
+    }
+  };
+
+  // Unassign custom images queue for a specific auditor, restoring full catalog
+  const handleUnassignImages = async (auditorId: string) => {
+    try {
+      const res = await fetch("/api/images/unassign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ auditorId })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAuditorImages(data.state.auditorImages || {});
+        setCurrentImageIndex(0);
+        return { success: true, message: data.message };
+      }
+      return { success: false, message: data.error || "Failed to clear assignment." };
+    } catch (e: any) {
+      console.error(e);
+      return { success: false, message: e.message || "Network error occurred." };
+    }
   };
 
   // Call server-side Gemini 3.5-flash audit evaluating active image
@@ -343,7 +519,7 @@ export default function App() {
 
   // Get active answers for current image and auditor in the active calibration phase
   const activeAnswers = React.useMemo(() => {
-    const activeImage = images[currentImageIndex];
+    const activeImage = activeImages[currentImageIndex];
     const activeRater = auditorProfile || "Rater A";
     if (!activeImage) return {};
 
@@ -360,18 +536,52 @@ export default function App() {
       map[a.variableId] = { value: a.value, confidence: a.confidence, comment: a.comment };
     });
     return map;
-  }, [audits, images, currentImageIndex, auditorProfile, calibrationPhase]);
+  }, [audits, activeImages, currentImageIndex, auditorProfile, calibrationPhase]);
 
   // Compute auditor progress
   const auditorProgress = React.useMemo(() => {
-    if (!auditorProfile) return { completed: 0, total: images.length };
+    if (!auditorProfile) return { completed: 0, total: activeImages.length };
     const completedImageIds = new Set(
       audits
         .filter((a) => a.auditorId === auditorProfile && a.mode === (calibrationPhase === "Reconciliation" ? "Validation" : calibrationPhase))
         .map((a) => a.imageId)
     );
-    return { completed: completedImageIds.size, total: images.length };
-  }, [audits, auditorProfile, images, calibrationPhase]);
+    return { completed: completedImageIds.size, total: activeImages.length };
+  }, [audits, auditorProfile, activeImages, calibrationPhase]);
+
+  // Set of panoramas the current auditor has fully completed (every applicable variable
+  // answered, respecting the footway dependency cascade). Used to mark nav dots green.
+  const completedImageIds = React.useMemo(() => {
+    const done = new Set<string>();
+    if (!auditorProfile) return done;
+    const mode = calibrationPhase === "Reconciliation" ? "Validation" : calibrationPhase;
+
+    // Build a per-image map of variableId -> value for this auditor and mode
+    const byImage: Record<string, Record<string, string>> = {};
+    audits.forEach((a) => {
+      if (a.auditorId === auditorProfile && a.mode === mode && a.protocol === "A") {
+        if (!byImage[a.imageId]) byImage[a.imageId] = {};
+        byImage[a.imageId][a.variableId] = a.value;
+      }
+    });
+
+    activeImages.forEach((img) => {
+      const ansMap = byImage[img.id] || {};
+      const allAnswered = variables.every((v) => {
+        // Optionals like image_visibility and additional_comments are not compulsory
+        if (v.id === "image_visibility" || v.id === "additional_comments") {
+          return true;
+        }
+        // A dependent variable that is currently disabled counts as satisfied
+        const disabled = v.requires ? ansMap[v.requires.variableId] !== v.requires.value : false;
+        if (disabled) return true;
+        const val = ansMap[v.id];
+        return val !== undefined && val !== "";
+      });
+      if (allAnswered) done.add(img.id);
+    });
+    return done;
+  }, [audits, activeImages, auditorProfile, calibrationPhase, variables]);
 
   // Retrieve active designation from cache at top level (prevents React hook order violation)
   const activeDesignation = React.useMemo(() => {
@@ -380,6 +590,41 @@ export default function App() {
     const localProfiles = JSON.parse(localProfilesStr);
     return localProfiles[auditorProfile]?.designation || "Auditor";
   }, [auditorProfile]);
+
+  // Handle auto-removal of auditor profile once they complete all their assigned images
+  useEffect(() => {
+    if (auditorProfile && auditorProgress.total > 0 && auditorProgress.completed === auditorProgress.total) {
+      const timer = setTimeout(async () => {
+        alert(`Congratulations ${auditorProfile}! You have successfully completed your assigned street audit task of ${auditorProgress.total} panoramas. Your profile has been finalized and removed from the active rater list.`);
+        
+        // Remove from raters list
+        const updatedRaters = raters.filter((r) => r !== auditorProfile);
+        
+        // Call handleSaveSettings to persist the removal on the backend
+        await handleSaveSettings({
+          raters: updatedRaters
+        });
+
+        // Also clean up server auditorImages queue
+        try {
+          await fetch("/api/images/unassign", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ auditorId: auditorProfile })
+          });
+        } catch (e) {
+          console.error("Failed to unassign images on profile completion:", e);
+        }
+
+        // Log out and return to role selection
+        setAuditorProfile(null);
+        localStorage.removeItem("vlsap_auditor_profile");
+        setActiveView("landing");
+      }, 1000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [auditorProfile, auditorProgress.completed, auditorProgress.total, raters]);
 
   if (loading) {
     return (
@@ -440,7 +685,7 @@ export default function App() {
 
               {/* AI Audit Card */}
               <button
-                onClick={() => setActiveView("ai")}
+                onClick={() => handleSecureNavigation("ai")}
                 className="group bg-white border-2 border-slate-200 hover:border-slate-900 rounded-xl p-6 flex flex-col items-center gap-4 transition-all cursor-pointer hover:shadow-lg hover:-translate-y-1 active:translate-y-0 text-center"
               >
                 <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-md group-hover:scale-110 transition-transform">
@@ -459,7 +704,7 @@ export default function App() {
 
               {/* Admin Card */}
               <button
-                onClick={() => setActiveView("admin")}
+                onClick={() => handleSecureNavigation("admin")}
                 className="group bg-white border-2 border-slate-200 hover:border-slate-900 rounded-xl p-6 flex flex-col items-center gap-4 transition-all cursor-pointer hover:shadow-lg hover:-translate-y-1 active:translate-y-0 text-center"
               >
                 <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shadow-md group-hover:scale-110 transition-transform">
@@ -478,8 +723,9 @@ export default function App() {
             </div>
 
             {/* Footer */}
-            <div className="text-center text-[10px] text-slate-400 font-mono">
-              VLSAP Academic Calibration • Managed Container Environment
+            <div className="text-center text-[10px] text-slate-400 font-mono space-y-1">
+              <div>VLSAP Academic Calibration • Managed Container Environment</div>
+              <div className="text-indigo-600 font-semibold mt-1">Made by Anshul Singh IITKGP</div>
             </div>
           </div>
         </div>
@@ -580,12 +826,12 @@ export default function App() {
                   <span className="bg-emerald-100 border border-emerald-200 text-emerald-700 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase">
                     ACTIVE SEGMENT
                   </span>
-                  <span>{currentImageIndex + 1} of {images.length} Panoramas</span>
+                  <span>{currentImageIndex + 1} of {activeImages.length} Panoramas</span>
                 </div>
 
                 <div className="flex items-center space-x-1.5">
                   <button
-                    onClick={() => setCurrentImageIndex((prev) => Math.max(0, prev - 1))}
+                    onClick={() => navigateImage((prev) => Math.max(0, prev - 1))}
                     disabled={currentImageIndex === 0}
                     className="p-1 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 rounded text-slate-700 transition-colors cursor-pointer border border-slate-200/60"
                   >
@@ -593,38 +839,56 @@ export default function App() {
                   </button>
 
                   <div className="flex space-x-0.5 max-w-[240px] overflow-x-auto py-0.5 px-1 bg-slate-50 rounded border border-slate-200/60">
-                    {images.map((img, idx) => (
-                      <button
-                        key={img.id}
-                        onClick={() => setCurrentImageIndex(idx)}
-                        className={`h-4 w-4 rounded-sm text-[9px] font-mono flex items-center justify-center font-bold shrink-0 transition-all cursor-pointer ${
-                          idx === currentImageIndex 
-                            ? "bg-slate-900 text-white" 
-                            : "bg-slate-200/70 text-slate-600 hover:bg-slate-300/80"
-                        }`}
-                      >
-                        {idx + 1}
-                      </button>
-                    ))}
+                    {activeImages.map((img, idx) => {
+                      const isDone = completedImageIds.has(img.id);
+                      const isActive = idx === currentImageIndex;
+                      return (
+                        <button
+                          key={img.id}
+                          title={isDone ? "Completed" : "Not yet completed"}
+                          onClick={() => navigateImage(idx)}
+                          className={`h-4 w-4 rounded-sm text-[9px] font-mono flex items-center justify-center font-bold shrink-0 transition-all cursor-pointer ${
+                            isDone
+                              ? "bg-emerald-500 text-white hover:bg-emerald-600"
+                              : "bg-slate-200/70 text-slate-600 hover:bg-slate-300/80"
+                          } ${isActive ? "ring-2 ring-inset ring-slate-900" : ""}`}
+                        >
+                          {idx + 1}
+                        </button>
+                      );
+                    })}
                   </div>
 
                   <button
-                    onClick={() => setCurrentImageIndex((prev) => Math.min(images.length - 1, prev + 1))}
-                    disabled={currentImageIndex === images.length - 1}
+                    onClick={() => navigateImage((prev) => Math.min(activeImages.length - 1, prev + 1))}
+                    disabled={currentImageIndex === activeImages.length - 1}
                     className="p-1 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 rounded text-slate-700 transition-colors cursor-pointer border border-slate-200/60"
                   >
                     <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      if (activeImages.length === 0) return;
+                      const randomIndex = Math.floor(Math.random() * activeImages.length);
+                      navigateImage(randomIndex);
+                    }}
+                    title="Jump to a Random Panorama"
+                    className="p-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded transition-colors cursor-pointer border border-amber-200/60 flex items-center space-x-1 text-[10px] font-semibold font-mono"
+                  >
+                    <Shuffle className="h-3 w-3" />
+                    <span>Random</span>
                   </button>
                 </div>
               </div>
 
               {/* Split layout: Image + Survey */}
-              {images[currentImageIndex] ? (
+              {activeImages[currentImageIndex] ? (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
                   {/* Left: Viewport */}
                   <div className="lg:col-span-7 space-y-2.5">
                     <ImageViewer
-                      image={images[currentImageIndex]}
+                      image={activeImages[currentImageIndex]}
                     />
                   </div>
 
@@ -632,17 +896,33 @@ export default function App() {
                   <div className="lg:col-span-5 h-[710px]">
                     <AuditForm
                       variables={variables}
-                      currentImageId={images[currentImageIndex].id}
+                      currentImageId={activeImages[currentImageIndex].id}
+                      currentImage={activeImages[currentImageIndex]}
                       activeRater={auditorProfile}
                       activeMode={calibrationPhase === "Reconciliation" ? "Validation" : calibrationPhase}
                       answers={activeAnswers}
                       onSaveAnswer={handleSaveAnswer}
+                      onNextSegment={() => {
+                        if (currentImageIndex === activeImages.length - 1) {
+                          const confirmExit = window.confirm("You have reached the end of your assigned segment. Log out?");
+                          if (confirmExit) {
+                            handleLogoutAuditor();
+                          }
+                        } else {
+                          navigateImage((prev) => prev + 1);
+                        }
+                      }}
+                      isLastSegment={currentImageIndex === activeImages.length - 1}
                     />
                   </div>
                 </div>
               ) : (
-                <div className="p-8 text-center border rounded border-slate-200 bg-white text-slate-400 font-sans text-xs">
-                  No images loaded. Please contact the project admin to sync images.
+                <div className="p-12 text-center border rounded-md border-amber-200 bg-amber-50/40 text-slate-500 font-sans text-xs flex flex-col items-center justify-center gap-2.5 shadow-sm max-w-md mx-auto my-8">
+                  <AlertCircle className="h-8 w-8 text-amber-600 animate-pulse" />
+                  <span className="font-bold text-slate-800 text-sm">No Task Assigned</span>
+                  <p className="text-slate-500 leading-normal text-[11px]">
+                    You do not have any calibration panoramas assigned to your auditor profile yet. Please ask the project administrator to assign your task queue.
+                  </p>
                 </div>
               )}
 
@@ -734,6 +1014,7 @@ export default function App() {
           audits={audits}
           raters={raters}
           googleApiKey={googleApiKey}
+          hasGoogleApiKey={hasGoogleApiKey}
           googleDriveFolderId={googleDriveFolderId}
           instrumentLocked={instrumentLocked}
           calibrationPhase={calibrationPhase}
@@ -741,6 +1022,14 @@ export default function App() {
           onSaveSettings={handleSaveSettings}
           onTriggerDriveSync={handleTriggerDriveSync}
           onClearAudits={handleClearAudits}
+          onShuffleImages={handleShuffleImages}
+          onResetImages={handleResetImages}
+          onAssignImages={handleAssignImages}
+          onUnassignImages={handleUnassignImages}
+          auditorImages={auditorImages}
+          auditorProfiles={auditorProfiles}
+          autoAssignEnabled={autoAssignEnabled}
+          autoAssignCount={autoAssignCount}
         />
 
         {/* IRR & Calibration Statistics */}
