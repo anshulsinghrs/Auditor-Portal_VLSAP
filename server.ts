@@ -616,19 +616,22 @@ app.post("/api/gemini/audit", async (req, res) => {
 
     // 3. Request Gemini to audit based on our variables and output structured JSON
     const systemPrompt = `You are an expert academic rater evaluating Google Street View images for the Vision-Language Street Audit Platform (VLSAP).
-You must analyze the provided street scene and audit the following 10 variables precisely:
-1. footway_present ("Present" or "Absent")
-2. usable_clear_path ("Unobstructed", "Partially Obstructed", "Blocked" - only if footway is Present)
-3. effective_width ("< 1.0m", "1.0m - 1.5m", "1.5m - 2.0m", "> 2.0m" - only if footway is Present)
-4. footway_continuity ("Continuous", "Intermittent/Broken", "No Footway" - only if footway is Present)
-5. surface_condition ("Good", "Fair", "Poor" - only if footway is Present)
-6. encroachment_severity ("None (Level 1)", "Minor (Level 2)", "Moderate (Level 3)", "Severe (Level 4)", "Total Obstruction (Level 5)" - only if footway is Present)
-7. parking_on_footway ("None", "1-2 Vehicles", "3+ Vehicles" - only if footway is Present)
-8. vending_intensity ("None", "Light", "Heavy" - only if footway is Present)
-9. traffic_threat ("Low", "Medium", "High")
-10. overall_walkability (A holistic score "1 (Very Poor)", "2", "3", "4", "5", "6", "7 (Excellent)")
+You must analyze the provided street scene and audit the following 13 variables precisely matching this schema:
+1. footway_presence ("Present", "Partially Present", "Absent", "Cannot Determine")
+2. footway_condition ("Good", "Moderate", "Poor", "Not Applicable", "Cannot Determine")
+3. footway_obstructions ("None", "Minor", "Major", "Not Applicable", "Cannot Determine")
+4. kerb_ramps ("Present", "Absent", "Not Applicable", "Cannot Determine")
+5. street_lighting ("Present", "Absent", "Cannot Determine")
+6. greenery ("Abundant", "Some", "None", "Cannot Determine")
+7. overall_walkability (A holistic score: "1 = Very Poor", "2", "3", "4", "5", "6", "7 = Excellent")
+8. safety (Pedestrian safety rating on a scale of "1", "2", "3", "4", "5", "6", "7")
+9. comfort (Pedestrian comfort rating on a scale of "1", "2", "3", "4", "5", "6", "7")
+10. pleasurability (Pedestrian pleasurability rating on a scale of "1", "2", "3", "4", "5", "6", "7")
+11. visible_problems (A comma-separated list of zero or more visible problems from the options: "No footway", "Damaged footway", "Narrow footway", "Parked vehicles on footway", "Street vendors", "Utility poles blocking path", "Debris or garbage", "Poor lighting", "Lack of greenery", "Unsafe traffic conditions", "Missing crossing facilities", "Other (please specify)")
+12. image_visibility ("Clearly Visible", "Partially Visible", "Significant Occlusion", "Cannot Determine")
+13. additional_comments (Any optional textual notes or observations)
 
-Make sure you adhere to physical evidence and the logical dependencies (e.g., if footway_present is Absent, then all footway metrics must be marked "N/A" or left blank, except continuity which is "No Footway"). Provide a confidence rating (1 to 5) and a descriptive comment for your visual observations.`;
+Make sure you adhere to physical evidence and the logical dependencies (e.g., if footway_presence is Absent, then condition, obstructions, and kerb_ramps should be "Not Applicable"). Provide a confidence rating (1 to 5) and a descriptive comment.`;
 
     const response = await ai.models.generateContent({
       model: "gemini-3.5-flash",
@@ -754,70 +757,92 @@ Make sure you adhere to physical evidence and the logical dependencies (e.g., if
 
 // Simulated Gemini responses for quick evaluation without key
 function simulateGeminiAudit(imageId: string) {
-  const isMarket = imageId.includes("I1") || imageId.includes("I6") || imageId.includes("I7") || imageId.includes("I10");
-  const isJunction = imageId.includes("I2");
-  const isGreen = imageId.includes("I4") || imageId.includes("I9");
+  const isMarket = imageId.includes("3.0") || imageId.includes("182.0");
+  const isJunction = imageId.includes("19.0");
+  const isGreen = imageId.includes("164.0");
   
   return [
     {
-      variableId: "footway_present",
-      value: isMarket && imageId.includes("I6") ? "Absent" : "Present",
+      variableId: "footway_presence",
+      value: isMarket && imageId.includes("3.0") ? "Absent" : "Present",
       confidence: 5,
-      comment: "A distinct concrete sidewalk structure is observed."
+      comment: "Clear view of concrete footway structure."
     },
     {
-      variableId: "usable_clear_path",
-      value: isMarket ? "Blocked" : isJunction ? "Partially Obstructed" : "Unobstructed",
+      variableId: "footway_condition",
+      value: isMarket && imageId.includes("3.0") ? "Not Applicable" : isMarket ? "Poor" : isGreen ? "Good" : "Moderate",
       confidence: 4,
-      comment: isMarket ? "Informal merchandise stalls and scooter parking completely occupy the walk width." : "Path is clear for standard pedestrian passage."
+      comment: "Pavement condition evaluated based on visual cracks and clean texture."
     },
     {
-      variableId: "effective_width",
-      value: isGreen ? "> 2.0m" : isMarket ? "< 1.0m" : "1.5m - 2.0m",
-      confidence: 4,
-      comment: "Width estimated visually relative to road markings and building doors."
-    },
-    {
-      variableId: "footway_continuity",
-      value: isMarket && imageId.includes("I6") ? "No Footway" : "Continuous",
+      variableId: "footway_obstructions",
+      value: isMarket && imageId.includes("3.0") ? "Not Applicable" : isMarket ? "Major" : isJunction ? "Minor" : "None",
       confidence: 5,
-      comment: "Sidewalk runs unbroken across the visible segment."
+      comment: "Visual obstacles (vendors, cars, poles) occupying walking path."
     },
     {
-      variableId: "surface_condition",
-      value: isMarket ? "Poor" : isGreen ? "Good" : "Fair",
+      variableId: "encroachment",
+      value: isMarket && imageId.includes("3.0") ? "Not Applicable" : isMarket ? "Major" : isJunction ? "Minor" : "None",
       confidence: 4,
-      comment: isMarket ? "High-definition view reveals crack patterns, concrete scaling, and dirt piling." : "Excellent smooth paving tiles with tactile guidance."
+      comment: "Encroachment evaluated based on clear walking space."
     },
     {
-      variableId: "encroachment_severity",
-      value: isMarket ? "Severe (Level 4)" : "None (Level 1)",
+      variableId: "street_lighting",
+      value: "Present",
+      confidence: 4,
+      comment: "Overhead lighting poles are clearly visible along the segment."
+    },
+    {
+      variableId: "greenery",
+      value: isGreen ? "Abundant" : isMarket ? "None" : "Some",
       confidence: 5,
-      comment: isMarket ? "Vending stalls, furniture, and boxes spill over, taking ~85% of pedestrian space." : "Sidewalk is entirely free of active street encroachments."
-    },
-    {
-      variableId: "parking_on_footway",
-      value: isMarket ? "3+ Vehicles" : "None",
-      confidence: 4,
-      comment: isMarket ? "Scooters and a loading hand-cart are parked on the pedestrian paved area." : "No vehicular parking detected on the footpath."
-    },
-    {
-      variableId: "vending_intensity",
-      value: isMarket ? "Heavy" : "None",
-      confidence: 5,
-      comment: isMarket ? "Multiple commercial and food stalls visible on the sidewalk." : "No street-vending booths identified."
-    },
-    {
-      variableId: "traffic_threat",
-      value: isGreen || isJunction ? "High" : "Low",
-      confidence: 4,
-      comment: isJunction ? "High multi-lane speed limits and turn volumes pose continuous threats." : "Narrow street design enforces slow speed profiles."
+      comment: "Trees and vegetation foliage density along the corridor."
     },
     {
       variableId: "overall_walkability",
       value: isGreen ? "6" : isMarket ? "2" : "4",
       confidence: 4,
-      comment: isGreen ? "Highly safe, pleasant, continuous sidewalk offering superb green shade." : "Severe obstructions and high conflict profiles yield extremely poor walkability."
+      comment: "Walkability score summarized holistically from path continuity and safety."
+    },
+    {
+      variableId: "safety",
+      value: isGreen ? "6" : isMarket ? "2" : "4",
+      confidence: 4,
+      comment: "Safety score reflecting pedestrian separation from vehicular flow."
+    },
+    {
+      variableId: "comfort",
+      value: isGreen ? "6" : isMarket ? "2" : "4",
+      confidence: 4,
+      comment: "Comfort score based on surface flatness and shade."
+    },
+    {
+      variableId: "pleasurability",
+      value: isGreen ? "6" : isMarket ? "3" : "4",
+      confidence: 4,
+      comment: "Ambiance and aesthetic score."
+    },
+    {
+      variableId: "visible_problems",
+      value: isMarket 
+        ? "Damaged footway, Parked vehicles on footway, Street vendors" 
+        : isJunction 
+          ? "Unsafe traffic conditions, Missing crossing facilities" 
+          : "None",
+      confidence: 4,
+      comment: "Specific observed street issues."
+    },
+    {
+      variableId: "image_visibility",
+      value: "Clearly Visible",
+      confidence: 5,
+      comment: "View is clear, camera lens is clean, and lighting is adequate."
+    },
+    {
+      variableId: "additional_comments",
+      value: "AI audit successfully executed on segment.",
+      confidence: 5,
+      comment: ""
     }
   ];
 }
@@ -826,15 +851,21 @@ function simulateGeminiAudit(imageId: string) {
 function getInitialMockAudits() {
   const records: any[] = [];
   const raters = ["Rater A", "Rater B", "Rater C", "Rater D", "Rater E"];
-  const variables = ["footway_present", "usable_clear_path", "effective_width", "footway_continuity", "surface_condition", "encroachment_severity", "parking_on_footway", "vending_intensity", "traffic_threat", "overall_walkability"];
+  const variables = [
+    "footway_presence", "footway_condition", "footway_obstructions", "encroachment",
+    "street_lighting", "greenery", "overall_walkability", "safety", "comfort",
+    "pleasurability", "visible_problems", "image_visibility", "additional_comments"
+  ];
+
+  const imgIds = ["Kolkata-3.0", "Kolkata-19.0", "Kolkata-44.0", "Kolkata-164.0", "Kolkata-182.0"];
 
   // Populate first 5 images for all raters in "Cold Read" and "Warm Read" to make agreement statistics fully populated!
   for (let imgIdx = 0; imgIdx < 5; imgIdx++) {
-    const imgId = `VLSAP-I${imgIdx + 1}`;
+    const imgId = imgIds[imgIdx];
     
     // Seed and vary answers slightly to produce highly realistic Krippendorff alpha computations!
-    const isI1 = imgId === "VLSAP-I1"; // Heavy encroachment
-    const isI4 = imgId === "VLSAP-I4"; // Perfect green walk
+    const isI1 = imgId === "Kolkata-3.0"; // Heavy encroachment / Absent footway simulation
+    const isI4 = imgId === "Kolkata-164.0"; // Perfect green walk
 
     raters.forEach((rater, rIdx) => {
       // COLD READS
@@ -842,27 +873,32 @@ function getInitialMockAudits() {
         let val = "";
         let conf = 4;
         
-        // Slightly vary answers by rIdx to simulate human disagreement!
-        if (vId === "footway_present") {
+        if (vId === "footway_presence") {
+          val = isI1 ? "Absent" : "Present";
+        } else if (vId === "footway_condition") {
+          val = isI1 ? "Not Applicable" : "Good";
+        } else if (vId === "footway_obstructions") {
+          val = isI1 ? "Not Applicable" : "None";
+        } else if (vId === "encroachment") {
+          val = isI1 ? "Not Applicable" : "None";
+        } else if (vId === "street_lighting") {
           val = "Present";
-        } else if (vId === "usable_clear_path") {
-          val = isI1 ? (rIdx % 2 === 0 ? "Blocked" : "Partially Obstructed") : "Unobstructed";
-        } else if (vId === "effective_width") {
-          val = isI4 ? "> 2.0m" : isI1 ? (rIdx % 3 === 0 ? "< 1.0m" : "1.0m - 1.5m") : "1.5m - 2.0m";
-        } else if (vId === "footway_continuity") {
-          val = "Continuous";
-        } else if (vId === "surface_condition") {
-          val = isI1 ? (rIdx % 2 === 0 ? "Poor" : "Fair") : "Good";
-        } else if (vId === "encroachment_severity") {
-          val = isI1 ? (rIdx === 0 ? "Severe (Level 4)" : rIdx === 1 ? "Moderate (Level 3)" : "Severe (Level 4)") : "None (Level 1)";
-        } else if (vId === "parking_on_footway") {
-          val = isI1 ? (rIdx % 2 === 0 ? "3+ Vehicles" : "1-2 Vehicles") : "None";
-        } else if (vId === "vending_intensity") {
-          val = isI1 ? "Heavy" : "None";
-        } else if (vId === "traffic_threat") {
-          val = isI4 ? "High" : "Low";
+        } else if (vId === "greenery") {
+          val = isI4 ? "Abundant" : "Some";
         } else if (vId === "overall_walkability") {
+          val = isI4 ? (rIdx % 2 === 0 ? "6" : "5") : isI1 ? (rIdx % 2 === 0 ? "2" : "3") : "4";
+        } else if (vId === "safety") {
           val = isI4 ? "6" : isI1 ? (rIdx % 2 === 0 ? "2" : "3") : "4";
+        } else if (vId === "comfort") {
+          val = isI4 ? "6" : isI1 ? (rIdx % 2 === 0 ? "2" : "3") : "4";
+        } else if (vId === "pleasurability") {
+          val = isI4 ? "6" : isI1 ? (rIdx % 2 === 0 ? "3" : "4") : "4";
+        } else if (vId === "visible_problems") {
+          val = isI1 ? "No footway" : "None";
+        } else if (vId === "image_visibility") {
+          val = "Clearly Visible";
+        } else if (vId === "additional_comments") {
+          val = "Initial assessment notes.";
         }
 
         records.push({
@@ -887,26 +923,32 @@ function getInitialMockAudits() {
         let val = "";
         let conf = 5;
 
-        if (vId === "footway_present") {
+        if (vId === "footway_presence") {
+          val = isI1 ? "Absent" : "Present";
+        } else if (vId === "footway_condition") {
+          val = isI1 ? "Not Applicable" : "Good";
+        } else if (vId === "footway_obstructions") {
+          val = isI1 ? "Not Applicable" : "None";
+        } else if (vId === "encroachment") {
+          val = isI1 ? "Not Applicable" : "None";
+        } else if (vId === "street_lighting") {
           val = "Present";
-        } else if (vId === "usable_clear_path") {
-          val = isI1 ? "Blocked" : "Unobstructed"; // Highly unified!
-        } else if (vId === "effective_width") {
-          val = isI4 ? "> 2.0m" : isI1 ? "1.0m - 1.5m" : "1.5m - 2.0m";
-        } else if (vId === "footway_continuity") {
-          val = "Continuous";
-        } else if (vId === "surface_condition") {
-          val = isI1 ? "Poor" : "Good";
-        } else if (vId === "encroachment_severity") {
-          val = isI1 ? "Severe (Level 4)" : "None (Level 1)"; // Fully converged!
-        } else if (vId === "parking_on_footway") {
-          val = isI1 ? "3+ Vehicles" : "None";
-        } else if (vId === "vending_intensity") {
-          val = isI1 ? "Heavy" : "None";
-        } else if (vId === "traffic_threat") {
-          val = isI4 ? "High" : "Low";
+        } else if (vId === "greenery") {
+          val = isI4 ? "Abundant" : "Some";
         } else if (vId === "overall_walkability") {
           val = isI4 ? "6" : isI1 ? "2" : "4"; // Fully unified!
+        } else if (vId === "safety") {
+          val = isI4 ? "6" : isI1 ? "2" : "4";
+        } else if (vId === "comfort") {
+          val = isI4 ? "6" : isI1 ? "2" : "4";
+        } else if (vId === "pleasurability") {
+          val = isI4 ? "6" : isI1 ? "3" : "4";
+        } else if (vId === "visible_problems") {
+          val = isI1 ? "No footway" : "None";
+        } else if (vId === "image_visibility") {
+          val = "Clearly Visible";
+        } else if (vId === "additional_comments") {
+          val = "Reconciled assessment notes.";
         }
 
         records.push({

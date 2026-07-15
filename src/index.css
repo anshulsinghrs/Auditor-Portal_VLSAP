@@ -50,3 +50,7 @@
     transform: translateY(0);
   }
 }
+
+@utility animate-spin-slow {
+  animation: spin 10s linear infinite;
+}

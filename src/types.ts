@@ -51,6 +51,8 @@ export interface VLSAPVariable {
   negativeExamples: string[];
   unknownRule: string;
   options: string[];
+  isMulti?: boolean;
+  isText?: boolean;
   requires?: {
     variableId: string;
     value: string;

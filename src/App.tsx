@@ -569,6 +569,10 @@ export default function App() {
     activeImages.forEach((img) => {
       const ansMap = byImage[img.id] || {};
       const allAnswered = variables.every((v) => {
+        // Optionals like image_visibility and additional_comments are not compulsory
+        if (v.id === "image_visibility" || v.id === "additional_comments") {
+          return true;
+        }
         // A dependent variable that is currently disabled counts as satisfied
         const disabled = v.requires ? ansMap[v.requires.variableId] !== v.requires.value : false;
         if (disabled) return true;
@@ -894,6 +898,7 @@ export default function App() {
                     <AuditForm
                       variables={variables}
                       currentImageId={activeImages[currentImageIndex].id}
+                      currentImage={activeImages[currentImageIndex]}
                       activeRater={auditorProfile}
                       activeMode={calibrationPhase === "Reconciliation" ? "Validation" : calibrationPhase}
                       answers={activeAnswers}
