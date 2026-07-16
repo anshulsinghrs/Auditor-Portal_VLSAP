@@ -167,7 +167,7 @@ export default function AuditForm({
                             </span>
                             <span className="text-xs font-semibold text-slate-800 leading-tight">
                               {v.name}
-                              {!disabled && v.id !== "image_visibility" && v.id !== "additional_comments" && (
+                              {!disabled && v.id !== "image_visibility" && v.id !== "additional_comments" && v.id !== "visible_problems" && (
                                 <span className="text-red-500 font-bold ml-0.5" title="Mandatory question">*</span>
                               )}
                             </span>

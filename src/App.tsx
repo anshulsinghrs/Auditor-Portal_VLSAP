@@ -179,6 +179,11 @@ export default function App() {
 
       // Find active variables that don't have a value
       const unanswered = variables.filter((v) => {
+        // Optional questions are not mandatory and never block navigation
+        if (v.id === "visible_problems") {
+          return false;
+        }
+
         // Evaluate requirements to see if this variable is enabled
         if (v.requires) {
           const depAns = currentImageAnswers.find(a => a.variableId === v.requires?.variableId)?.value;
@@ -568,8 +573,8 @@ export default function App() {
     activeImages.forEach((img) => {
       const ansMap = byImage[img.id] || {};
       const allAnswered = variables.every((v) => {
-        // Optionals like image_visibility and additional_comments are not compulsory
-        if (v.id === "image_visibility" || v.id === "additional_comments") {
+        // Optionals like visible_problems, image_visibility and additional_comments are not compulsory
+        if (v.id === "visible_problems" || v.id === "image_visibility" || v.id === "additional_comments") {
           return true;
         }
         // A dependent variable that is currently disabled counts as satisfied
