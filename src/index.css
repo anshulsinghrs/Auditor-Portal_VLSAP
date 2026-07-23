@@ -6,6 +6,28 @@
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
+/* Mobile hardening: keep text from being auto-resized on orientation change and
+   stop the whole page from scrolling sideways when a wide child slips its bounds. */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+/* On phones, browsers (notably iOS Safari) auto-zoom when focusing an input whose
+   font is under 16px. Bump interactive controls to 16px on small screens so tapping
+   a field never yanks the viewport around. */
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
 /* Custom scrollbar to keep layout premium and minimal */
 ::-webkit-scrollbar {
   width: 6px;

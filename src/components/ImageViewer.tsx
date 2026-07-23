@@ -17,6 +17,8 @@ export default function ImageViewer({ image }: ImageViewerProps) {
 
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
+  // Tracks the initial finger spread + scale for two-finger pinch zoom on touch devices
+  const pinchRef = useRef<{ dist: number; scale: number } | null>(null);
 
   // Reset viewport state, direction and view mode on image change
   useEffect(() => {
@@ -43,6 +45,47 @@ export default function ImageViewer({ image }: ImageViewerProps) {
 
   const handleMouseUp = () => {
     setIsDragging(false);
+  };
+
+  // Touch handlers — enable one-finger panning and two-finger pinch zoom on phones/tablets.
+  // The canvas sets `touch-none` so the browser does not hijack these gestures.
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      const t = e.touches[0];
+      setIsDragging(true);
+      setDragStart({ x: t.clientX - position.x, y: t.clientY - position.y });
+    } else if (e.touches.length === 2) {
+      setIsDragging(false);
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      pinchRef.current = { dist: Math.hypot(dx, dy), scale };
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && pinchRef.current) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.hypot(dx, dy);
+      const ratio = dist / (pinchRef.current.dist || 1);
+      setScale(Math.max(1, Math.min(5, pinchRef.current.scale * ratio)));
+    } else if (e.touches.length === 1 && isDragging) {
+      const t = e.touches[0];
+      setPosition({ x: t.clientX - dragStart.x, y: t.clientY - dragStart.y });
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (e.touches.length === 0) {
+      setIsDragging(false);
+      pinchRef.current = null;
+    } else if (e.touches.length === 1) {
+      // Lift from a pinch back to a single finger — resume panning cleanly
+      pinchRef.current = null;
+      const t = e.touches[0];
+      setIsDragging(true);
+      setDragStart({ x: t.clientX - position.x, y: t.clientY - position.y });
+    }
   };
 
   // Wheel zoom handler
@@ -85,7 +128,7 @@ export default function ImageViewer({ image }: ImageViewerProps) {
   return (
     <div
       className={`relative bg-slate-950 rounded overflow-hidden border border-slate-800 flex flex-col ${
-        isFullscreen ? "fixed inset-0 z-50 rounded-none border-none" : "h-[480px] w-full"
+        isFullscreen ? "fixed inset-0 z-50 rounded-none border-none" : "h-[320px] sm:h-[400px] lg:h-[480px] w-full"
       }`}
       id="vlsap-panorama-viewer"
     >
@@ -109,12 +152,16 @@ export default function ImageViewer({ image }: ImageViewerProps) {
                   : undefined
               }
             />
-            <span className="font-sans tracking-wide uppercase">
+            <span className="font-sans tracking-wide uppercase hidden sm:inline">
               {viewMode === "Panorama" ? "Panorama View" : `${activeDirection} View (${
                 activeDirection === "North" ? "0° N" :
                 activeDirection === "East" ? "90° E" :
                 activeDirection === "South" ? "180° S" : "270° W"
               })`}
+            </span>
+            {/* Compact label for narrow phone screens */}
+            <span className="font-sans tracking-wide uppercase sm:hidden">
+              {viewMode === "Panorama" ? "Pano" : activeDirection.charAt(0)}
             </span>
           </div>
         </div>
@@ -218,12 +265,15 @@ export default function ImageViewer({ image }: ImageViewerProps) {
       {/* Main viewport canvas */}
       <div
         ref={containerRef}
-        className="flex-1 w-full h-full relative overflow-hidden bg-slate-950 flex items-center justify-center select-none"
+        className="flex-1 w-full h-full relative overflow-hidden bg-slate-950 flex items-center justify-center select-none touch-none"
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
       >
         {/* PANORAMA VIEW WITH INTERACTIVE DRAG/ZOOM */}
         <div
@@ -237,7 +287,7 @@ export default function ImageViewer({ image }: ImageViewerProps) {
             ref={imageRef}
             src={imageUrl}
             alt={viewMode === "Panorama" ? `${image.name} - Panorama view` : `${image.name} - ${activeDirection} view`}
-            className="max-h-full max-w-none object-contain h-[380px] shadow-none pointer-events-none rounded-sm"
+            className="max-h-full max-w-none object-contain h-[280px] sm:h-[340px] lg:h-[380px] shadow-none pointer-events-none rounded-sm"
             referrerPolicy="no-referrer"
           />
         </div>
