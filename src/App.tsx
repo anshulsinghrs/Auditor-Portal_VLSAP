@@ -747,21 +747,21 @@ export default function App() {
       return (
         <div className="min-h-screen bg-slate-50 flex flex-col font-sans" id="vlsap-root">
           {/* Minimal header */}
-          <header className="bg-white border-b border-slate-200/80 px-4 py-2 flex items-center justify-between sticky top-0 z-40">
-            <div className="flex items-center space-x-2.5">
-              <div className="p-1.5 bg-gradient-to-br from-emerald-500 to-teal-600 rounded text-white">
+          <header className="bg-white border-b border-slate-200/80 px-4 py-2 flex items-center justify-between gap-2 sticky top-0 z-40">
+            <div className="flex items-center space-x-2.5 min-w-0">
+              <div className="p-1.5 bg-gradient-to-br from-emerald-500 to-teal-600 rounded text-white shrink-0">
                 <User className="h-4 w-4" />
               </div>
-              <div>
-                <h1 className="text-sm font-bold tracking-tight text-slate-900">Auditor Portal</h1>
-                <p className="text-[10px] text-slate-500 font-mono">VLSAP • {currentProject}</p>
+              <div className="min-w-0">
+                <h1 className="text-sm font-bold tracking-tight text-slate-900 truncate">Auditor Portal</h1>
+                <p className="text-[10px] text-slate-500 font-mono truncate">VLSAP • {currentProject}</p>
               </div>
             </div>
             <button
               onClick={() => setActiveView("landing")}
-              className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold rounded border border-slate-200 transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold rounded border border-slate-200 transition-colors cursor-pointer shrink-0"
             >
-              <ArrowLeft className="h-3 w-3" /> Switch Role
+              <ArrowLeft className="h-3 w-3 shrink-0" /> <span className="hidden sm:inline">Switch Role</span><span className="sm:hidden">Role</span>
             </button>
           </header>
 
@@ -785,14 +785,14 @@ export default function App() {
       <div className="min-h-screen bg-slate-50 flex flex-col font-sans" id="vlsap-root">
         {/* Auditor-specific header */}
         <header className="bg-white border-b border-slate-200/80 px-4 py-2 flex flex-col md:flex-row md:items-center justify-between gap-2 sticky top-0 z-40">
-          <div className="flex items-center space-x-2.5">
-            <div className="p-1.5 bg-gradient-to-br from-emerald-500 to-teal-600 rounded text-white">
+          <div className="flex items-center space-x-2.5 min-w-0">
+            <div className="p-1.5 bg-gradient-to-br from-emerald-500 to-teal-600 rounded text-white shrink-0">
               <User className="h-4 w-4" />
             </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <h1 className="text-sm font-bold tracking-tight text-slate-900">{auditorProfile}</h1>
-                <span className="bg-emerald-50 text-emerald-700 text-[9px] font-mono px-1.5 py-0.5 rounded font-bold uppercase border border-emerald-200">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <h1 className="text-sm font-bold tracking-tight text-slate-900 truncate min-w-0">{auditorProfile}</h1>
+                <span className="bg-emerald-50 text-emerald-700 text-[9px] font-mono px-1.5 py-0.5 rounded font-bold uppercase border border-emerald-200 shrink-0">
                   {calibrationPhase}
                 </span>
               </div>
@@ -897,8 +897,8 @@ export default function App() {
                     />
                   </div>
 
-                  {/* Right: Audit Form (survey only) */}
-                  <div className="lg:col-span-5 h-[710px]">
+                  {/* Right: Audit Form (survey only) — natural height on mobile, fixed scroll pane on desktop */}
+                  <div className="lg:col-span-5 h-auto lg:h-[710px]">
                     <AuditForm
                       variables={variables}
                       currentImageId={activeImages[currentImageIndex].id}
@@ -954,21 +954,21 @@ export default function App() {
   if (activeView === "ai") {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col font-sans" id="vlsap-root">
-        <header className="bg-white border-b border-slate-200/80 px-4 py-2 flex items-center justify-between sticky top-0 z-40">
-          <div className="flex items-center space-x-2.5">
-            <div className="p-1.5 bg-gradient-to-br from-indigo-500 to-purple-600 rounded text-white">
+        <header className="bg-white border-b border-slate-200/80 px-4 py-2 flex items-center justify-between gap-2 sticky top-0 z-40">
+          <div className="flex items-center space-x-2.5 min-w-0">
+            <div className="p-1.5 bg-gradient-to-br from-indigo-500 to-purple-600 rounded text-white shrink-0">
               <Bot className="h-4 w-4" />
             </div>
-            <div>
-              <h1 className="text-sm font-bold tracking-tight text-slate-900">AI Audit Interface</h1>
-              <p className="text-[10px] text-slate-500 font-mono">Gemini 3.5 Flash • {currentProject}</p>
+            <div className="min-w-0">
+              <h1 className="text-sm font-bold tracking-tight text-slate-900 truncate">AI Audit Interface</h1>
+              <p className="text-[10px] text-slate-500 font-mono truncate">Gemini 3.5 Flash • {currentProject}</p>
             </div>
           </div>
           <button
             onClick={() => setActiveView("landing")}
-            className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold rounded border border-slate-200 transition-colors cursor-pointer"
+            className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold rounded border border-slate-200 transition-colors cursor-pointer shrink-0"
           >
-            <ArrowLeft className="h-3 w-3" /> Switch Role
+            <ArrowLeft className="h-3 w-3 shrink-0" /> <span className="hidden sm:inline">Switch Role</span><span className="sm:hidden">Role</span>
           </button>
         </header>
 
@@ -994,21 +994,21 @@ export default function App() {
   // ==========================================
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans" id="vlsap-root">
-      <header className="bg-white border-b border-slate-200/80 px-4 py-2 flex items-center justify-between sticky top-0 z-40">
-        <div className="flex items-center space-x-2.5">
-          <div className="p-1.5 bg-gradient-to-br from-amber-500 to-orange-600 rounded text-white">
+      <header className="bg-white border-b border-slate-200/80 px-4 py-2 flex items-center justify-between gap-2 sticky top-0 z-40">
+        <div className="flex items-center space-x-2.5 min-w-0">
+          <div className="p-1.5 bg-gradient-to-br from-amber-500 to-orange-600 rounded text-white shrink-0">
             <ShieldCheck className="h-4 w-4" />
           </div>
-          <div>
-            <h1 className="text-sm font-bold tracking-tight text-slate-900">Admin Dashboard</h1>
-            <p className="text-[10px] text-slate-500 font-mono">Project Management • {currentProject}</p>
+          <div className="min-w-0">
+            <h1 className="text-sm font-bold tracking-tight text-slate-900 truncate">Admin Dashboard</h1>
+            <p className="text-[10px] text-slate-500 font-mono truncate">Project Management • {currentProject}</p>
           </div>
         </div>
         <button
           onClick={() => setActiveView("landing")}
-          className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold rounded border border-slate-200 transition-colors cursor-pointer"
+          className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold rounded border border-slate-200 transition-colors cursor-pointer shrink-0"
         >
-          <ArrowLeft className="h-3 w-3" /> Switch Role
+          <ArrowLeft className="h-3 w-3 shrink-0" /> <span className="hidden sm:inline">Switch Role</span><span className="sm:hidden">Role</span>
         </button>
       </header>
 
